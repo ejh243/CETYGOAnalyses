@@ -154,6 +154,7 @@ save(betastest, phenotest,
 
 ## Find a sufficient number of CpGs to include ########
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
 library(genefilter)
 
@@ -161,26 +162,13 @@ library(genefilter)
 model = pickCompProbes(rawbetas = as.matrix(betas),
                        cellTypes = levels(as.factor(pheno$Sample.Type)),
                        cellInd = as.factor(pheno$Sample.Type),
-                       numProbes =  50,
+                       numProbes =  10,
                        probeSelect = "auto")
 
 
 
 
-rawbetas = as.matrix(betas)
-cellTypes = levels(as.factor(pheno$Sample.Type))
-cellInd = as.factor(pheno$Sample.Type)
-numProbes =  50
-probeSelect = "auto"
 
-
-
-
-
-class(betas)
-
-
-dim(as.matrix(betas))
 
 
 
