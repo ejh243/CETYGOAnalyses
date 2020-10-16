@@ -1,5 +1,12 @@
 ### Functions for error testing
 
+library(quadprog)
+library(genefilter)
+library(tidyr)
+library(ggplot2)
+library(cowplot)
+library(scales)
+
 ### CellTypeSubsetBetasAndPheno #######################
 ### subsetting betas and phenotype using cell type information given the cell type names wanted to keep 
 
@@ -7,7 +14,7 @@
 ##         betas
 ##         pheno
 ##         cell type column name
-##         bothOrJustBetas - can return just betas and ignore pheno
+##         justBetas - can return just betas and ignore pheno
 ## The order of betas and pheno must be matching
 
 ## OUTPUT: betas and pheno in a list 
@@ -20,9 +27,9 @@
 # # cellTypeNames = c("B_cells", "CD4.T_cells", "CD8.T_cells", "Granulocytes", "testFake")
 # phenoColName = "Sample.Type"
 # 
-# x = CellTypeSubsetBetasAndPheno(cellTypeNames, betas, pheno, phenoColName, bothOrJustBetas = T)
+# x = CellTypeSubsetBetasAndPheno(cellTypeNames, betas, pheno, phenoColName, justBetas = T)
 
-CellTypeSubsetBetasAndPheno = function(cellTypeNames, betas, pheno, phenoColName, bothOrJustBetas = F){
+CellTypeSubsetBetasAndPheno = function(cellTypeNames, betas, pheno, phenoColName, justBetas = F){
   
   ## ensure that phenocol is a factor
   phenoCol = as.factor(pheno[,phenoColName])
@@ -35,7 +42,7 @@ CellTypeSubsetBetasAndPheno = function(cellTypeNames, betas, pheno, phenoColName
   betasOut = betas[, phenoCol %in% cellTypeNames]
   phenoOut = pheno[phenoCol %in% cellTypeNames, ]
   
-  if (bothOrJustBetas == T){
+  if (justBetas == T){
     return(betasOut)
   }
   
@@ -86,7 +93,7 @@ randomNSumToProp = function(totalProportion = 100, n ){
 # cellTypeNames = c("B_cells")
 # # cellTypeNames = c("B_cells", "CD4.T_cells", "CD8.T_cells", "Granulocytes", "testFake")
 # phenoColName = "Sample.Type"
-# nBulk = 12
+# nBulk = 8
 # noiseIn = F
 # proportionNoise = c(0.1,0.2,0.3,0.2,0.1,0.3)
 # proportionsMatrixType = "random"
@@ -107,7 +114,7 @@ CellTypeProportionSimulator = function(betas, pheno, phenoColName, nBulk,
   ## separate each cell type out
   cellSamplesAlone = list()
   for(i in 1:nCellTypes){
-    cellSamplesAlone[[i]] = CellTypeSubsetBetasAndPheno(cellTypes[i], betas, pheno, phenoColName, bothOrJustBetas = T)
+    cellSamplesAlone[[i]] = CellTypeSubsetBetasAndPheno(cellTypes[i], betas, pheno, phenoColName, justBetas = T)
   }
   
   ## If not input, create proportionsMatrix
@@ -171,7 +178,10 @@ GetModelCG = function(betas, modelList){
   
   rownamesAll = unique(rownamesAll)
   
-  return(betas[rownames(betas) %in% rownamesAll,])
+  betasMismatched = betas[rownames(betas) %in% rownamesAll,]
+  
+  betas = betasMismatched[match(rownamesAll, rownames(betasMismatched)),]
+  return(betas)
 }
 
 
@@ -180,20 +190,18 @@ GetModelCG = function(betas, modelList){
 ### From model, predict proportions with error and output error vs residuals of true vs actual in testing
 
 ##  INPUT: model
-##         testBetas
+##         testBetas - only those in model
 ##         testPheno
-##         phenoColName
-##         
 
 ## OUTPUT: plot x = abs(true- pred), y = error, col = cell type
 
-## test data
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
-library(quadprog)
-library(tidyr)
-library(ggplot2)
-library(cowplot)
-
+# ## test data
+# source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
+# library(quadprog)
+# library(tidyr)
+# library(ggplot2)
+# library(cowplot)
+# 
 # model = pickCompProbes(rawbetas = as.matrix(betas),
 #                        cellTypes = levels(as.factor(pheno$Sample.Type)),
 #                        cellInd = as.factor(pheno$Sample.Type),
@@ -223,13 +231,14 @@ PredictionErrorAndResiduals = function(model, testBetas, testPheno){
   print(ggplot(plotDat, aes(x = residuals, y = error, col = cellType, shape = cellType)) +
           geom_point(size = 2) +
           theme_cowplot(18) +
-          ylim(c(0,max(plotDat$error))))
+          ylim(c(0,max(plotDat$error)))+
+          labs(x = "|Actual - Predicted|", y = "Error", shape = "Cell type", col = "Cell type"))
 }
 
 
 
 
-### modelCompareStackedBar ############################
+### ModelCompareStackedBar ############################
 
 ##  INPUT: testBetas - can containing all betas present in any model
 ##         modelList - must be list form even if only 1 model
@@ -240,60 +249,84 @@ PredictionErrorAndResiduals = function(model, testBetas, testPheno){
 ##                     will be coloured in grey not a cell type
 ##         trueProportions = NA Matrix of true proportions from CellTypeProportionSimulator
 ##         nCpGPlot = F - plot number of CpGs?
+##         sampleNamesOnPlots = F
 
 ## OUTPUT: stackedBarCharts per model for nBulk samples
 
+# ## test data
+# source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
+# load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
+# library(quadprog)
+# library(genefilter)
+# library(tidyr)
+# library(ggplot2)
+# library(cowplot)
+# library(scales)
+# 
+# model1 = pickCompProbes(rawbetas = as.matrix(betas),
+#                         cellTypes = levels(as.factor(pheno$Sample.Type)),
+#                         cellInd = as.factor(pheno$Sample.Type),
+#                         numProbes =  10,
+#                         probeSelect = "auto")
+# 
+# model2 = pickCompProbes(rawbetas = as.matrix(betas),
+#                         cellTypes = levels(as.factor(pheno$Sample.Type)),
+#                         cellInd = as.factor(pheno$Sample.Type),
+#                         numProbes =  20,
+#                         probeSelect = "auto")
+# 
+# phenoNewCellType = pheno
+# phenoNewCellType[pheno$Sample.Type == "CD4.T_cells", "Sample.Type"] = "Other_cell"
+# 
+# model3 = pickCompProbes(rawbetas = as.matrix(betas),
+#                         cellTypes = levels(as.factor(phenoNewCellType$Sample.Type)),
+#                         cellInd = as.factor(phenoNewCellType$Sample.Type),
+#                         numProbes =  10,
+#                         probeSelect = "auto")
+# 
+# test = CellTypeProportionSimulator(GetModelCG(betas, list(model1, model2, model3)),
+#                                    pheno,
+#                                    phenoColName = "Sample.Type",
+#                                    nBulk = 8,
+#                                    proportionsMatrixType = "random")
+# nBulk = 8
+# testNoise = CellTypeProportionSimulator(GetModelCG(betas, list(model1, model2, model3)),
+#                                         pheno,
+#                                         phenoColName = "Sample.Type",
+#                                         nBulk = 8,
+#                                         proportionsMatrixType = "random",
+#                                         noiseIn = T,
+#                                         proportionNoise = seq(0.01, 0.1, 0.01)[1:nBulk])
+# 
+# testBetas = testNoise[[1]]
+# trueProportions = testNoise[[2]]
+# modelList = list(NameTest1 = model1, SecondModel = model2, thirds = model3)
+# i = 1
+# modelList = list(NameTest1 = model1)
+# 
+# trueComparison = T
+# noise = T
+# nCpGPlot = F
+# sampleNamesOnPlots = F
+# 
+# x = ModelCompareStackedBar(testBetas,
+#                            list(model1), nCpGPlot = F, 
+#                            sampleNamesOnPlots = F)
+# x = ModelCompareStackedBar(testBetas,
+#                            modelList,
+#                            trueComparison = T,
+#                            noise = T,
+#                            trueProportions = trueProportions)
 
-
-## test data
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
-load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
-library(quadprog)
-library(genefilter)
-library(tidyr)
-library(ggplot2)
-library(cowplot)
-library(scales)  
-
-model1 = pickCompProbes(rawbetas = as.matrix(betas),
-                        cellTypes = levels(as.factor(pheno$Sample.Type)),
-                        cellInd = as.factor(pheno$Sample.Type),
-                        numProbes =  10,
-                        probeSelect = "auto")
-
-model2 = pickCompProbes(rawbetas = as.matrix(betas),
-                        cellTypes = levels(as.factor(pheno$Sample.Type)),
-                        cellInd = as.factor(pheno$Sample.Type),
-                        numProbes =  20,
-                        probeSelect = "auto")
-
-phenoNewCellType = pheno
-phenoNewCellType[pheno$Sample.Type == "CD4.T_cells", "Sample.Type"] = "Other_cell"
-
-model3 = pickCompProbes(rawbetas = as.matrix(betas),
-                        cellTypes = levels(as.factor(phenoNewCellType$Sample.Type)),
-                        cellInd = as.factor(phenoNewCellType$Sample.Type),
-                        numProbes =  10,
-                        probeSelect = "auto")
-
-test = CellTypeProportionSimulator(GetModelCG(betas, list(model1, model2, model3)),
-                                   pheno,
-                                   phenoColName = "Sample.Type",
-                                   nBulk = 10,
-                                   proportionsMatrixType = "random")
-testBetas = test[[1]]
-trueProportions = test[[2]]
-modelList = list(NameTest1 = model1, SecondModel = model2, thirds = model3)
-i = 1
-
-
-
-modelCompareStackedBar = function(testBetas, 
+ModelCompareStackedBar = function(testBetas, 
                                   modelList, 
                                   trueComparison = F,
                                   noise = F,
                                   trueProportions = NA,
-                                  nCpGPlot = F){
+                                  nCpGPlot = F,
+                                  sampleNamesOnPlots = F){
+  
+  plotList = list()
   
   ## predict cell proportions with each model and save in a data frame
   predictions = data.frame(matrix(ncol = 6, nrow = 0))
@@ -309,23 +342,43 @@ modelCompareStackedBar = function(testBetas,
   }
   
   ## plot error per sample per model
-  ggplot(predictions, aes(x = sample, y = error, col = model)) +
-    geom_point() +
-    theme_cowplot(18) +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-    labs(x = "Sample", y = "Error") +
-    ylim(c(0, max(predictions$error)))
-  
-  if(nCpGPlot == T){
-    ## plot nCpG per sample per model
-    ggplot(predictions, aes(x = sample, y = nCGmissing, col = model)) +
+  if(sampleNamesOnPlots){
+    plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
       geom_point() +
       theme_cowplot(18) +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      labs(x = "Sample", y = "CGs missing") +
+      labs(x = "Sample", y = "Error") +
       ylim(c(0, max(predictions$error)))
+  }else{plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
+    geom_point() +
+    theme_cowplot(18) +
+    theme(axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank()) +
+    labs(x = "Sample", y = "Error") +
+    ylim(c(0, max(predictions$error)))
   }
   
+  if(nCpGPlot == T){
+    ## plot nCpG per sample per model
+    if(sampleNamesOnPlots){
+      plotList[[2]] = ggplot(predictions, aes(x = sample, y = nCGmissing, col = model)) +
+        geom_point() +
+        theme_cowplot(18) +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+        labs(x = "Sample", y = "CGs missing") +
+        ylim(c(0, max(predictions$error)))
+    }else{
+      plotList[[2]] = ggplot(predictions, aes(x = sample, y = nCGmissing, col = model)) +
+        geom_point() +
+        theme_cowplot(18) +
+        theme(axis.title.x=element_blank(),
+              axis.text.x=element_blank(),
+              axis.ticks.x=element_blank()) +
+        labs(x = "Sample", y = "CGs missing") +
+        ylim(c(0, max(predictions$error)))
+    }
+  }
   
   if(trueComparison == T){
     predictions = predictions[,-which(colnames(predictions) %in% c("error", "nCGmissing"))]
@@ -333,6 +386,7 @@ modelCompareStackedBar = function(testBetas,
     trueProportions = cbind.data.frame(trueProportions, sample = rownames(trueProportions), model = "True proportions")
     trueProportions = gather(trueProportions, key = "cellType", value = "proportion_pred", 
                              -one_of(c("sample", "model")))
+    predictions = rbind.data.frame(predictions, trueProportions)
     
   }
   
@@ -345,27 +399,96 @@ modelCompareStackedBar = function(testBetas,
     
     
     ## plot stacked  bar chart
-    for(i in 1:length(modelList)){
-      plotDat = predictions[predictions$model == names(modelList)[i],]
+    for(i in 1:length(levels(as.factor(predictions$model)))){
+      plotDat = predictions[predictions$model == levels(as.factor(predictions$model))[i],]
       
       colNeeded = which(allCellTypes %in% levels(as.factor(as.character(plotDat$cellType))))
       
-      ggplot(plotDat, aes(x = sample, y = proportion_pred, fill = cellType)) +
-        geom_bar(position="stack", stat="identity") +
-        theme_cowplot(18) +
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-        labs(x = "Sample", y = "Proportion", fill = "Cell type") +
-        ggtitle(names(modelList)[i]) +
-        scale_fill_manual(values = c(colPerCell[colNeeded]))
+      if(sampleNamesOnPlots){
+        plotList[[length(plotList)+1]] = ggplot(plotDat, aes(x = sample, y = proportion_pred, fill = cellType)) +
+          geom_bar(position="stack", stat="identity") +
+          theme_cowplot(18) +
+          theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+          labs(x = "Sample", y = "Proportion", fill = "Cell type") +
+          ggtitle(levels(as.factor(predictions$model))[i]) +
+          scale_fill_manual(values = c(colPerCell[colNeeded]))
+      }else{
+        plotList[[length(plotList)+1]] = ggplot(plotDat, aes(x = sample, y = proportion_pred, fill = cellType)) +
+          geom_bar(position="stack", stat="identity") +
+          theme_cowplot(18) +
+          theme(axis.title.x=element_blank(),
+                axis.text.x=element_blank(),
+                axis.ticks.x=element_blank()) +
+          labs(x = "Sample", y = "Proportion", fill = "Cell type") +
+          ggtitle(levels(as.factor(predictions$model))[i]) +
+          scale_fill_manual(values = c(colPerCell[colNeeded]))
+      }
     }
   }else{
+    predictions$cellType = as.factor(predictions$cellType)
+    allCellTypes = levels(predictions$cellType)
     
+    ## create one colour for each cell type with grey for noise
+    hues = hue_pal()(length(allCellTypes)-1)
+    colPerCell = c(matrix(nrow = 1, ncol = length(allCellTypes)))
+    colPerCell[which(allCellTypes == "Noise")] = "#555353"
+    colPerCell[-which(allCellTypes == "Noise")] = hues
     
-    
+    for(i in 1:length(levels(as.factor(predictions$model)))){
+      plotDat = predictions[predictions$model == levels(as.factor(predictions$model))[i],]
+      
+      colNeeded = which(allCellTypes %in% levels(as.factor(as.character(plotDat$cellType))))
+      
+      if(sampleNamesOnPlots){
+        plotList[[length(plotList)+1]] = ggplot(plotDat, aes(x = sample, y = proportion_pred, fill = cellType)) +
+          geom_bar(position="stack", stat="identity") +
+          theme_cowplot(18) +
+          theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+          labs(x = "Sample", y = "Proportion", fill = "Cell type") +
+          ggtitle(levels(as.factor(predictions$model))[i]) +
+          scale_fill_manual(values = c(colPerCell[colNeeded]))
+      }else{
+        plotList[[length(plotList)+1]] = ggplot(plotDat, aes(x = sample, y = proportion_pred, fill = cellType)) +
+          geom_bar(position="stack", stat="identity") +
+          theme_cowplot(18) +
+          theme(axis.title.x=element_blank(),
+                axis.text.x=element_blank(),
+                axis.ticks.x=element_blank()) +
+          labs(x = "Sample", y = "Proportion", fill = "Cell type") +
+          ggtitle(levels(as.factor(predictions$model))[i]) +
+          scale_fill_manual(values = c(colPerCell[colNeeded]))
+      }
+    }
   }
+  return(plotList)
+}
+
+
+
+### TrueVSPredictedPlot ###############################
+
+
+##  INPUT: pred - predicted cell types
+##         true - true proportions
+
+## OUTPUT: plot true vs pred
+
+# ## test data
+# pred 
+# true = bulkPheno
+
+
+TrueVSPredictedPlot = function(pred, true){
+  
+  plotDat = cbind.data.frame(gather(data.frame(pred), key = "cellType", value = "proportion_pred", 
+                                    -one_of(c("error","nCGmissing"))),
+                             gather(data.frame(true), key = "cellType_true", value = "proportion_true"))
   
   
-  
+  print(ggplot(plotDat, aes(x = proportion_pred, y = proportion_true, col = cellType, shape = cellType)) +
+    geom_point() +
+    theme_cowplot(18) +
+    labs(x= "Predicted", y = "Actual", shape = "Cell type", col = "Cell type"))
   
 }
 

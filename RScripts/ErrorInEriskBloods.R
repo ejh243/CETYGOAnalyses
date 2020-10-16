@@ -37,7 +37,7 @@ for (i in 2:6){
 library(ggplot2)
 library(cowplot)
 
-# pdf("/mnt/data1/Thea/ErrorMetric/plots/predictedAgeAcrossAllCellTypes.pdf", height = 5, width = 8)
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/createTrainTest/predictedAgeAcrossAllCellTypes.pdf", height = 5, width = 8)
 # ggplot(bloodphenomerge, aes(x = PatientID, y = PredictedAge, col = Sample.Type)) +
 #   geom_point() +
 #   theme_cowplot() +
@@ -62,7 +62,7 @@ trainFIndex = which(wholebloodphenomerge$sex =="F")[which(!which(wholebloodpheno
 wholebloodphenomerge[c(trainMIndex, trainFIndex),5] = "train" 
 wholebloodphenomerge[c(testMIndex, testFIndex),5] = "test"
 
-# pdf("/mnt/data1/Thea/ErrorMetric/plots/trainTestSamplesAcrossPredictedAgeAndSex.pdf", height = 5, width = 5)
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/createTrainTest/trainTestSamplesAcrossPredictedAgeAndSex.pdf", height = 5, width = 5)
 # ggplot(wholebloodphenomerge, aes(x = sex, y = PredictedAge, col = V5)) +
 #   geom_jitter(width = 0.3, size = 2) +
 #   theme_cowplot() +
@@ -99,7 +99,7 @@ for  (i in 1:length(bloodbeta)){
     labs(col = "")
 }
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/PCAPerCellTypeTrainTest.pdf", height = 6, width = 15)
+pdf("/mnt/data1/Thea/ErrorMetric/plots/createTrainTest/PCAPerCellTypeTrainTest.pdf", height = 6, width = 15)
 plot_grid(plotL[[1]], 
           plotL[[2]], 
           plotL[[3]], 
@@ -141,10 +141,10 @@ save(bloodBeta, bloodPheno,
 ## save train and test data
 betas = bloodBeta[,intersect(which(bloodPheno$traintest == "train"), which(bloodPheno$Sample.Type != "whole blood"))]
 betastest = bloodBeta[,intersect(which(bloodPheno$traintest == "test"), which(bloodPheno$Sample.Type != "whole blood"))]
-  
+
 pheno = bloodPheno[intersect(which(bloodPheno$traintest == "train"), which(bloodPheno$Sample.Type != "whole blood")),]
 phenotest = bloodPheno[intersect(which(bloodPheno$traintest == "train"), which(bloodPheno$Sample.Type != "whole blood")),]
-  
+
 save(betas, pheno,
      file = "/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
 save(betastest, phenotest,
@@ -152,29 +152,92 @@ save(betastest, phenotest,
 
 
 
-## Find a sufficient number of CpGs to include ########
+## Verify that 150 CpG per cell type is enough ########
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
-library(genefilter)
+
+## make model
+model150CG = pickCompProbes(rawbetas = as.matrix(betas),
+                            cellTypes = levels(as.factor(pheno$Sample.Type)),
+                            cellInd = as.factor(pheno$Sample.Type),
+                            numProbes =  150,
+                            probeSelect = "auto")
+
+## simulate 50 samples with random proportions
+bulk = CellTypeProportionSimulator(betas, pheno, "Sample.Type", 15)
+bulkBetas = bulk[[1]]
+bulkPheno = bulk[[2]]
+
+## keep only CpGs in model in bulkBetas
+bulkBetasCG = GetModelCG(bulkBetas, list(model150CG = model))  
+
+## predict proportions
+pred = projectCellTypeWithError(bulkBetasCG, model$coefEsts)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGErrorResidual.pdf", height = 4, width = 6)
+PredictionErrorAndResiduals(model, bulkBetasCG, bulkPheno)
+dev.off()
+
+plots = ModelCompareStackedBar(bulkBetas, list(model150CG = model), trueComparison = T, trueProportions = bulkPheno)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGStackedBar.pdf", height = 8, width = 12)
+plot_grid(plots[[1]],plots[[2]], plots[[3]], ncol =1, align = "v", axis = "b", rel_heights = c(0.5,1,1))
+dev.off()
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGTrueVSPredicted.pdf", height = 4, width = 6)
+TrueVSPredictedPlot(pred, bulkPheno)
+dev.off()
 
 
-model = pickCompProbes(rawbetas = as.matrix(betas),
-                       cellTypes = levels(as.factor(pheno$Sample.Type)),
-                       cellInd = as.factor(pheno$Sample.Type),
-                       numProbes =  10,
-                       probeSelect = "auto")
+
+## Create models using 3:n cell types #################
+
+## For each cell type there will be a model name shorthand:
+## B = B cell 
+## C4 = CD4 T cell
+## C8 = CD8 T cell
+## G = Granulocytes
+## M = Monocytes
+
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
+
+## make design matrix of booleans for which cell type will be present
+designMatrix = expand.grid(c(T,F), c(T,F), c(T,F), c(T,F), c(T,F))
+designMatrix = designMatrix[apply(designMatrix, 1, sum) >= 3,]
+
+cellTypes = c("B_cells", "CD4.T_cells", "CD8.T_cells", "Granulocytes", "Monocytes")
+cellTypeShorthand = c("B", "C4", "C8", "G", "M")
+
+modelList = list()
+for (i in 1:nrow(designMatrix)){
+  modellingDat = CellTypeSubsetBetasAndPheno(cellTypes[unlist(designMatrix[i,])],
+                                             betas, pheno, phenoColName = "Sample.Type", justBetas = F)
+  modelList[[i]] = pickCompProbes(rawbetas = as.matrix(modellingDat[[1]]),
+                                  cellTypes = levels(as.factor(modellingDat[[2]]$Sample.Type)),
+                                  cellInd = as.factor(modellingDat[[2]]$Sample.Type),
+                                  numProbes =  150,
+                                  probeSelect = "auto")
+  names(modelList)[i] = paste("model", paste(cellTypeShorthand[unlist(designMatrix[i,])], sep = "", collapse = ""), sep = "_")
+}
+
+save(modelList, file = "/mnt/data1/Thea/ErrorMetric/data/VaryNCellsData.Rdata")
+
+bulk = CellTypeProportionSimulator(GetModelCG(betas, modelList),
+                            pheno,
+                            phenoColName = "Sample.Type",
+                            nBulk = 15,
+                            proportionsMatrixType = "random")
+
+stackedPlots = ModelCompareStackedBar(bulk[[1]],
+                           modelList, 
+                           nCpGPlot = F,
+                           sampleNamesOnPlots = F,
+                           trueComparison = T,
+                           trueProportions = bulk[[2]])
+
+save(modelList, bulk, stackedPlots, file = "/mnt/data1/Thea/ErrorMetric/data/VaryNCellsData.Rdata")
 
 
-
-
-
-
-
-
-
-
-
-
-
-## Create models using 2:n cell types #################
