@@ -206,7 +206,7 @@ load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
 
 ## make design matrix of booleans for which cell type will be present
 designMatrix = expand.grid(c(T,F), c(T,F), c(T,F), c(T,F), c(T,F))
-designMatrix = designMatrix[apply(designMatrix, 1, sum) >= 3,]
+designMatrix = designMatrix[apply(designMatrix, 1, sum) >= 2,]
 
 cellTypes = c("B_cells", "CD4.T_cells", "CD8.T_cells", "Granulocytes", "Monocytes")
 cellTypeShorthand = c("B", "C4", "C8", "G", "M")
@@ -239,5 +239,116 @@ stackedPlots = ModelCompareStackedBar(bulk[[1]],
                            trueProportions = bulk[[2]])
 
 save(modelList, bulk, stackedPlots, file = "/mnt/data1/Thea/ErrorMetric/data/VaryNCellsData.Rdata")
+
+
+x = stackedPlots[[1]]$data
+levels(as.factor(stackedPlots[[1]]$data$model))
+
+## add columns for which cell types in each data set adn tehn compare specific models
+modelPresent = matrix(ncol = length(cellTypes), nrow = nrow(x), data = 0)
+colnames(modelPresent) = cellTypeShorthand
+
+for(i in 1:5){
+  modelPresent[grep(cellTypeShorthand[i],x$model),i] = 1
+}
+
+y = rowSums(modelPresent)
+plotDat = data.frame(x,modelPresent, sums = y)
+
+
+## colour by number of cells in model
+ggplot(plotDat, aes(x = sample, y = error, col = as.factor(sums), size = as.factor(sums))) +
+  geom_point(alpha = 0.8) +
+  theme_cowplot(18) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  labs(x = "Sample", y = "Error", col = "Number of\ncelltypes in\nthe model", size = "Number of\ncelltypes in\nthe model") +
+  ylim(c(0, max(plotDat$error)))
+
+plotDatBox = spread(plotDat, key = c(cellType), value = c(proportion_pred))
+ggplot(plotDatBox, aes(x = as.factor(sums), y = error, fill = as.factor(sums))) +
+  geom_boxplot() +
+  geom_jitter() +
+  theme_cowplot(18) +
+  labs(x = "Number of cell types in the model", y = "Error", fill = "Number of\ncell types in\nthe model") +
+  ylim(c(0, max(plotDat$error)))
+
+# library(ggpubr)
+# ggboxplot()
+
+## general Q: 
+## why do some still predict well? low proportion of that cell type? cell type less important?
+
+## compare those with only 4 to simplify the question
+plotDat4 = plotDatBox[plotDatBox$sums == 4, ]
+
+model4Index = which(rowSums(designMatrix) == 4)
+models4 = modelList[model4Index]
+
+models4Compared = ModelCompareStackedBar(bulk[[1]], 
+                                  modelList = models4, 
+                                  trueComparison = T,
+                                  noise = F,
+                                  trueProportions = bulk[[2]],
+                                  nCpGPlot = F,
+                                  sampleNamesOnPlots = F)
+
+ggplot(plotDat4, aes(x = model, y = error, fill = model))+
+  geom_boxplot() +
+  geom_jitter() +
+  theme_cowplot(18) +
+  labs(x = "Model", y = "Error", fill = "Model") +
+  ylim(c(0, max(plotDat$error)))
+
+models4Compared[[1]]
+
+plot_grid(models4Compared[[7]],
+          models4Compared[[3]],
+          models4Compared[[4]], 
+          ncol = 1)
+
+plot_grid(models4Compared[[7]],
+          models4Compared[[5]],
+          models4Compared[[6]], 
+          ncol = 1)
+
+plot_grid(models4Compared[[7]],
+          models4Compared[[2]], ncol = 1)
+
+C4C8bulk = data.frame(bulk[[2]])
+C4C8bulk$CD4_CD8 = C4C8bulk$CD4.T_cells + C4C8bulk$CD8.T_cells
+C4C8bulk = C4C8bulk[,-c(2,3)]
+C4C8bulk = C4C8bulk[,c(1,4,2,3)]
+CD4Model = plotDat4[which(plotDat4$model == "model_BC4GM"),c(1, 2, 3, 11, 12, 14, 15)]
+CD4Model = CD4Model[match(rownames(C4C8bulk), CD4Model$sample),-3]
+colnames(CD4Model)[4] = "CD4_CD8"
+CD4Plot = TrueVSPredictedPlot(CD4Model, C4C8bulk)
+
+CD8Model = plotDat4[which(plotDat4$model == "model_BC8GM"),c(1, 2, 3, 11, 13, 14, 15)]
+CD8Model = CD8Model[match(rownames(C4C8bulk), CD8Model$sample),-3]
+colnames(CD8Model)[4] = "CD4_CD8"
+CD8Plot = TrueVSPredictedPlot(CD8Model, C4C8bulk)
+
+
+plot_grid(CD4Plot, CD8Plot, ncol = 1, labels = c("CD8 missing", "CD4 missing"))
+
+
+## compare true proportion of B cell to error in model without B cells
+BModel = plotDat4[which(plotDat4$model == "model_C4C8GM"),]
+BModel = BModel[match(rownames(bulk[[2]]), BModel$sample),]
+BModelCompare = cbind.data.frame(error = BModel$error, B_cells = as.data.frame(bulk[[2]])$B_cells)
+
+
+ggplot(BModelCompare, aes(x = B_cells, y = error)) +
+  geom_point(size = 2) +
+  theme_cowplot(18) +
+  labs(x = "Proportion of B cells", y = "Error")
+
+
+TrueVSPredictedPlot(plotDat4[which(plotDat4$model == "model_BC8GM"),c(1,2,11:15)], bulk[[2]])
+TrueVSPredictedPlot(plotDat4[which(plotDat4$model == "model_C4C8GM"),c(1,2,11:15)], bulk[[2]])
+TrueVSPredictedPlot(plotDat4[which(plotDat4$model == "model_BC4C8M"),c(1,2,11:15)], bulk[[2]])
+TrueVSPredictedPlot(plotDat4[which(plotDat4$model == "model_BC4C8G"),c(1,2,11:15)], bulk[[2]])
 
 
