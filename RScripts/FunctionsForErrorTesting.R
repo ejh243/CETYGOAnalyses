@@ -328,6 +328,10 @@ ModelCompareStackedBar = function(testBetas,
   
   plotList = list()
   
+  if(is.null(names(modelList))){
+    message("Name your models!!")
+  }
+  
   ## predict cell proportions with each model and save in a data frame
   predictions = data.frame(matrix(ncol = 6, nrow = 0))
   for(i in 1:length(modelList)){

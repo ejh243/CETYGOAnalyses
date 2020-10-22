@@ -143,7 +143,7 @@ betas = bloodBeta[,intersect(which(bloodPheno$traintest == "train"), which(blood
 betastest = bloodBeta[,intersect(which(bloodPheno$traintest == "test"), which(bloodPheno$Sample.Type != "whole blood"))]
 
 pheno = bloodPheno[intersect(which(bloodPheno$traintest == "train"), which(bloodPheno$Sample.Type != "whole blood")),]
-phenotest = bloodPheno[intersect(which(bloodPheno$traintest == "train"), which(bloodPheno$Sample.Type != "whole blood")),]
+phenotest = bloodPheno[intersect(which(bloodPheno$traintest == "test"), which(bloodPheno$Sample.Type != "whole blood")),]
 
 save(betas, pheno,
      file = "/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
@@ -211,36 +211,37 @@ designMatrix = designMatrix[apply(designMatrix, 1, sum) >= 2,]
 cellTypes = c("B_cells", "CD4.T_cells", "CD8.T_cells", "Granulocytes", "Monocytes")
 cellTypeShorthand = c("B", "C4", "C8", "G", "M")
 
-modelList = list()
-for (i in 1:nrow(designMatrix)){
-  modellingDat = CellTypeSubsetBetasAndPheno(cellTypes[unlist(designMatrix[i,])],
-                                             betas, pheno, phenoColName = "Sample.Type", justBetas = F)
-  modelList[[i]] = pickCompProbes(rawbetas = as.matrix(modellingDat[[1]]),
-                                  cellTypes = levels(as.factor(modellingDat[[2]]$Sample.Type)),
-                                  cellInd = as.factor(modellingDat[[2]]$Sample.Type),
-                                  numProbes =  150,
-                                  probeSelect = "auto")
-  names(modelList)[i] = paste("model", paste(cellTypeShorthand[unlist(designMatrix[i,])], sep = "", collapse = ""), sep = "_")
-}
+# modelList = list()
+# for (i in 1:nrow(designMatrix)){
+#   modellingDat = CellTypeSubsetBetasAndPheno(cellTypes[unlist(designMatrix[i,])],
+#                                              betas, pheno, phenoColName = "Sample.Type", justBetas = F)
+#   modelList[[i]] = pickCompProbes(rawbetas = as.matrix(modellingDat[[1]]),
+#                                   cellTypes = levels(as.factor(modellingDat[[2]]$Sample.Type)),
+#                                   cellInd = as.factor(modellingDat[[2]]$Sample.Type),
+#                                   numProbes =  150,
+#                                   probeSelect = "auto")
+#   names(modelList)[i] = paste("model", paste(cellTypeShorthand[unlist(designMatrix[i,])], sep = "", collapse = ""), sep = "_")
+# }
+# 
+# save(modelList, file = "/mnt/data1/Thea/ErrorMetric/data/VaryNCellsData.Rdata")
+# 
+# bulk = CellTypeProportionSimulator(GetModelCG(betas, modelList),
+#                             pheno,
+#                             phenoColName = "Sample.Type",
+#                             nBulk = 15,
+#                             proportionsMatrixType = "random")
+# 
+# stackedPlots = ModelCompareStackedBar(bulk[[1]],
+#                            modelList, 
+#                            nCpGPlot = F,
+#                            sampleNamesOnPlots = F,
+#                            trueComparison = T,
+#                            trueProportions = bulk[[2]])
+# 
+# save(modelList, bulk, stackedPlots, file = "/mnt/data1/Thea/ErrorMetric/data/VaryNCellsData.Rdata")
 
-save(modelList, file = "/mnt/data1/Thea/ErrorMetric/data/VaryNCellsData.Rdata")
-
-bulk = CellTypeProportionSimulator(GetModelCG(betas, modelList),
-                            pheno,
-                            phenoColName = "Sample.Type",
-                            nBulk = 15,
-                            proportionsMatrixType = "random")
-
-stackedPlots = ModelCompareStackedBar(bulk[[1]],
-                           modelList, 
-                           nCpGPlot = F,
-                           sampleNamesOnPlots = F,
-                           trueComparison = T,
-                           trueProportions = bulk[[2]])
-
-save(modelList, bulk, stackedPlots, file = "/mnt/data1/Thea/ErrorMetric/data/VaryNCellsData.Rdata")
-
-
+## load the models
+load("/mnt/data1/Thea/ErrorMetric/data/VaryNCellsData.Rdata")
 x = stackedPlots[[1]]$data
 levels(as.factor(stackedPlots[[1]]$data$model))
 
@@ -271,8 +272,9 @@ ggplot(plotDatBox, aes(x = as.factor(sums), y = error, fill = as.factor(sums))) 
   geom_boxplot() +
   geom_jitter() +
   theme_cowplot(18) +
-  labs(x = "Number of cell types in the model", y = "Error", fill = "Number of\ncell types in\nthe model") +
-  ylim(c(0, max(plotDat$error)))
+  labs(x = "Number of cell types in the model", y = "Error") +
+  ylim(c(0, max(plotDat$error))) +
+  theme(legend.position = "none") 
 
 # library(ggpubr)
 # ggboxplot()
@@ -287,18 +289,19 @@ model4Index = which(rowSums(designMatrix) == 4)
 models4 = modelList[model4Index]
 
 models4Compared = ModelCompareStackedBar(bulk[[1]], 
-                                  modelList = models4, 
-                                  trueComparison = T,
-                                  noise = F,
-                                  trueProportions = bulk[[2]],
-                                  nCpGPlot = F,
-                                  sampleNamesOnPlots = F)
+                                         modelList = models4, 
+                                         trueComparison = T,
+                                         noise = F,
+                                         trueProportions = bulk[[2]],
+                                         nCpGPlot = F,
+                                         sampleNamesOnPlots = F)
 
 ggplot(plotDat4, aes(x = model, y = error, fill = model))+
   geom_boxplot() +
   geom_jitter() +
   theme_cowplot(18) +
-  labs(x = "Model", y = "Error", fill = "Model") +
+  labs(x = "Model", y = "Error") +
+  theme(legend.position = "none") +
   ylim(c(0, max(plotDat$error)))
 
 models4Compared[[1]]
@@ -316,10 +319,12 @@ plot_grid(models4Compared[[7]],
 plot_grid(models4Compared[[7]],
           models4Compared[[2]], ncol = 1)
 
+## plot if the sum of CD4 and 8 are the same in models without them
 C4C8bulk = data.frame(bulk[[2]])
 C4C8bulk$CD4_CD8 = C4C8bulk$CD4.T_cells + C4C8bulk$CD8.T_cells
 C4C8bulk = C4C8bulk[,-c(2,3)]
 C4C8bulk = C4C8bulk[,c(1,4,2,3)]
+
 CD4Model = plotDat4[which(plotDat4$model == "model_BC4GM"),c(1, 2, 3, 11, 12, 14, 15)]
 CD4Model = CD4Model[match(rownames(C4C8bulk), CD4Model$sample),-3]
 colnames(CD4Model)[4] = "CD4_CD8"
@@ -330,8 +335,26 @@ CD8Model = CD8Model[match(rownames(C4C8bulk), CD8Model$sample),-3]
 colnames(CD8Model)[4] = "CD4_CD8"
 CD8Plot = TrueVSPredictedPlot(CD8Model, C4C8bulk)
 
-
 plot_grid(CD4Plot, CD8Plot, ncol = 1, labels = c("CD8 missing", "CD4 missing"))
+
+
+## plot if the sum of CD4 and 8 are the same in models without them
+MGbulk = data.frame(bulk[[2]])
+MGbulk$M_G = MGbulk$Monocytes + MGbulk$Granulocytes
+MGbulk = MGbulk[,-c(4,5)]
+
+MModel = plotDat4[which(plotDat4$model == "model_BC4C8M"),c(1, 2, 3, 11, 12, 13, 15)]
+MModel = MModel[match(rownames(MGbulk), MModel$sample),-3]
+colnames(MModel)[6] = "M_G"
+MPlot = TrueVSPredictedPlot(MModel, MGbulk)
+
+GModel = plotDat4[which(plotDat4$model == "model_BC4C8G"),c(1, 2, 3, 11, 12, 13, 14)]
+GModel = GModel[match(rownames(MGbulk), GModel$sample),-3]
+colnames(GModel)[4] = "M_G"
+GPlot = TrueVSPredictedPlot(GModel, MGbulk)
+
+
+plot_grid(MPlot, GPlot, ncol = 1, labels = c("Granulocytes missing", "Monocytes missing"))
 
 
 ## compare true proportion of B cell to error in model without B cells
@@ -346,9 +369,137 @@ ggplot(BModelCompare, aes(x = B_cells, y = error)) +
   labs(x = "Proportion of B cells", y = "Error")
 
 
-TrueVSPredictedPlot(plotDat4[which(plotDat4$model == "model_BC8GM"),c(1,2,11:15)], bulk[[2]])
-TrueVSPredictedPlot(plotDat4[which(plotDat4$model == "model_C4C8GM"),c(1,2,11:15)], bulk[[2]])
-TrueVSPredictedPlot(plotDat4[which(plotDat4$model == "model_BC4C8M"),c(1,2,11:15)], bulk[[2]])
-TrueVSPredictedPlot(plotDat4[which(plotDat4$model == "model_BC4C8G"),c(1,2,11:15)], bulk[[2]])
 
 
+### Compare error when data contains noise ############
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDatatest.Rdata")
+
+## create model with all 5 cell types and 150 CpGs
+model = pickCompProbes(rawbetas = as.matrix(betas),
+                       cellTypes = levels(as.factor(pheno$Sample.Type)),
+                       cellInd = as.factor(pheno$Sample.Type),
+                       numProbes =  150,
+                       probeSelect = "auto")
+
+## create simulated samples with increasing noise
+testData = CellTypeProportionSimulator(betas = betastest, 
+                                       pheno = phenotest, 
+                                       phenoColName = "Sample.Type", 
+                                       nBulk = 9, 
+                                       proportionsMatrix = "random",
+                                       noiseIn = T,
+                                       proportionNoise = seq(0,0.4,0.05))
+
+stackedWithNoise = ModelCompareStackedBar(testBetas = testData[[1]], 
+                                  modelList = list(Predicted = model), 
+                                  trueComparison = T,
+                                  noise = T,
+                                  trueProportions = testData[[2]],
+                                  nCpGPlot = F,
+                                  sampleNamesOnPlots = F)
+
+
+plot_grid(stackedWithNoise[[1]] + theme(legend.position = "none"), 
+          stackedWithNoise[[2]], 
+          stackedWithNoise[[3]], 
+          ncol = 1, 
+          align = "v", axis = "lr", 
+          rel_heights = c(0.4,1,1))
+
+
+## repeate with more samples and bigger range of error
+testData = CellTypeProportionSimulator(betas = betastest, 
+                                       pheno = phenotest, 
+                                       phenoColName = "Sample.Type", 
+                                       nBulk = length(seq(0,1,0.02)), 
+                                       proportionsMatrix = "random",
+                                       noiseIn = T,
+                                       proportionNoise = seq(0,1,0.02))
+
+stackedWithNoise = ModelCompareStackedBar(testBetas = testData[[1]], 
+                                          modelList = list(Predicted = model), 
+                                          trueComparison = T,
+                                          noise = T,
+                                          trueProportions = testData[[2]],
+                                          nCpGPlot = F,
+                                          sampleNamesOnPlots = F)
+
+## plot noise vs error
+NEDat = cbind.data.frame(error = stackedWithNoise[[1]]$data$error, noise = seq(0,1,0.02))
+
+ggplot(NEDat, aes(x = noise, y = error)) +
+  geom_point(size = 2) +
+  theme_cowplot(18) +
+  labs(x = "Proportion of noise", y = "Error")
+
+
+### Compare whole blood, simulated and buccal predictions of blood cell types ###### 
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDatatest.Rdata")
+load("/mnt/data1/Eilis/Projects/Asthma/CellTypeComparisons/Correlations_New/BetasSortedByCellType_NoY.rdat")
+
+## create model with all 5 cell types and 150 CpGs
+model = pickCompProbes(rawbetas = as.matrix(betas),
+                       cellTypes = levels(as.factor(pheno$Sample.Type)),
+                       cellInd = as.factor(pheno$Sample.Type),
+                       numProbes =  150,
+                       probeSelect = "auto")
+
+## create simulated samples with increasing noise
+testData = CellTypeProportionSimulator(betas = betastest, 
+                                       pheno = phenotest, 
+                                       phenoColName = "Sample.Type", 
+                                       nBulk = 9, 
+                                       proportionsMatrix = "random",
+                                       noiseIn = F)
+
+simStackedBar = ModelCompareStackedBar(testBetas = testData[[1]], 
+                                     modelList = list(Simulated = model), 
+                                     trueComparison = T,
+                                     noise = F,
+                                     trueProportions = testData[[2]],
+                                     nCpGPlot = F,
+                                     sampleNamesOnPlots = F)
+
+
+nasalStackedBar = ModelCompareStackedBar(testBetas = allbetas[[8]][,which(!is.na(colnames(allbetas[[8]])))], 
+                                          modelList = list(Nasal = model), 
+                                          trueComparison = F,
+                                          noise = F,
+                                          trueProportions = NA,
+                                          nCpGPlot = F,
+                                          sampleNamesOnPlots = F)
+
+
+wholeBloodStackedBar = ModelCompareStackedBar(testBetas = allbetas[[5]][,which(!is.na(colnames(allbetas[[5]])))], 
+                                             modelList = list(Wholeblood = model), 
+                                             trueComparison = F,
+                                             noise = F,
+                                             trueProportions = NA,
+                                             nCpGPlot = F,
+                                             sampleNamesOnPlots = F)
+
+buccalStackedBar = ModelCompareStackedBar(testBetas = allbetas[[1]][,which(!is.na(colnames(allbetas[[1]])))], 
+                                          modelList = list(Buccal = model), 
+                                          trueComparison = F,
+                                          noise = F,
+                                          trueProportions = NA,
+                                          nCpGPlot = F,
+                                          sampleNamesOnPlots = F)
+
+## plot error against cell type 
+plotDat = rbind.data.frame(cbind.data.frame(error = simStackedBar[[1]]$data$error[1:9], cellType = "Simulated\nblood"),
+                           cbind.data.frame(error = wholeBloodStackedBar[[1]]$data$error[1:28], cellType = "Whole\nblood"),
+                           cbind.data.frame(error = buccalStackedBar[[1]]$data$error[1:28], cellType = "Buccal"),
+                           cbind.data.frame(error = nasalStackedBar[[1]]$data$error[1:19], cellType = "Nasal"))
+
+ggplot(plotDat, aes(x = cellType, y = error, fill = cellType)) +                           
+  geom_violin() +
+  theme_cowplot(18) +
+  theme(legend.position = "none") +
+  labs(x = "Cell type", y = "Error")
