@@ -2,7 +2,27 @@
 ## Dorothea Seiler Vellame
 ## started 09-10-2020
 
+## get stats on samples #####
+load("/mnt/data1/Eilis/Projects/Asthma/CellTypeComparisons/Correlations_New/BetasSortedByCellType_NoY.rdat")
 
+tableOfSamples = data.frame(matrix(ncol = 11, nrow = 30, data = 0))
+colnames(tableOfSamples) = c("Sample", types, "Train", "Test")
+tableOfSamples$Sample = individuals
+
+for(i in 1:8){
+  tableOfSamples[,i+1] = 1
+  tableOfSamples[which(is.na(allphenos[[i]][,"PatientID"])),i+1] = 0
+}
+ 
+load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataFull.Rdata")
+
+trainTestInfo = unique(bloodPheno[,c("PatientID", "traintest")])
+tableOfSamples$Train[which(tableOfSamples$Sample %in% trainTestInfo[which(trainTestInfo$traintest == "train"),1])] = 1
+tableOfSamples$Test[which(tableOfSamples$Sample %in% trainTestInfo[which(trainTestInfo$traintest == "test"),1])] = 1
+  
+tableOfSamples = rbind.data.frame(tableOfSamples, c("Total", colSums(tableOfSamples[,2:ncol(tableOfSamples)])))
+write.csv(tableOfSamples, file = "/mnt/data1/Thea/ErrorMetric/data/tableOfERiskSamples.csv")
+  
 ## QC original data ###################################
 ## make PCAs, remove non blood data and NA samples
 ## assign train test status and show randomness
@@ -152,44 +172,116 @@ save(betastest, phenotest,
 
 
 
+
+
+
+
+
+
 ## Verify that 150 CpG per cell type is enough ########
+## Don't include plots with error as that's not in the narative yet! This should just show that 150 is more than enough
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDatatest.Rdata")
 
-## make model
-model150CG = pickCompProbes(rawbetas = as.matrix(betas),
-                            cellTypes = levels(as.factor(pheno$Sample.Type)),
-                            cellInd = as.factor(pheno$Sample.Type),
-                            numProbes =  150,
-                            probeSelect = "auto")
+## Plot number of CpGs vs correlation between actual & pred 
+## make models 
+modelListCpG = list()
+cpg = c(1:25,seq(30,55,5), seq(60, 150, 10))
+for (i in 1:length(cpg)) {
+  modelListCpG[[i]] = pickCompProbes(rawbetas = as.matrix(betas),
+                                     cellTypes = levels(as.factor(pheno$Sample.Type)),
+                                     cellInd = as.factor(pheno$Sample.Type),
+                                     numProbes =  cpg[i],
+                                     probeSelect = "auto")
+  names(modelListCpG)[i] = paste("model", cpg[i], "CG", sep = "")
+}
 
-## simulate 50 samples with random proportions
-bulk = CellTypeProportionSimulator(betas, pheno, "Sample.Type", 15)
+## simulate 40 bulk samples
+bulk = CellTypeProportionSimulator(betastest, phenotest, "Sample.Type", 40)
 bulkBetas = bulk[[1]]
 bulkPheno = bulk[[2]]
 
-## keep only CpGs in model in bulkBetas
-bulkBetasCG = GetModelCG(bulkBetas, list(model150CG = model))  
 
-## predict proportions
-pred = projectCellTypeWithError(bulkBetasCG, model$coefEsts)
+## get predicted value for each model
+truevpred = list()
+corDat = c()
+for (i in 1:length(cpg)) {
+  pred = projectCellTypeWithError(GetModelCG(bulkBetas, list(modelCG = modelListCpG[[i]])) , modelListCpG[[i]]$coefEsts)
+  truevpred[[i]] = TrueVSPredictedPlot(pred, bulkPheno)
+  corDat = c(corDat, cor(truevpred[[i]]$data$proportion_pred, truevpred[[i]]$data$proportion_true))
+}
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGErrorResidual.pdf", height = 4, width = 6)
-PredictionErrorAndResiduals(model, bulkBetasCG, bulkPheno)
+corPlot = data.frame(corDat, cpg)
+
+p1 = ggplot(corPlot, aes(x = cpg, y = corDat)) +
+  geom_point() +
+  theme_cowplot(18) +
+  labs(x = "Number of CpGs", y = "Correlation") +
+  ylim(c(0.9965, 0.999))
+
+
+## Use model with 150 CpGs
+p2 = truevpred[[which(cpg == 150)]]
+
+## cor of p2
+corDat[which(cpg == 150)]
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGComboPlots.pdf", height = 4, width = 11)
+plot_grid(p1,
+          p2,
+          rel_widths = c(1,1.35),
+          ncol = 2,
+          labels = "AUTO")
 dev.off()
 
-plots = ModelCompareStackedBar(bulkBetas, list(model150CG = model), trueComparison = T, trueProportions = bulkPheno)
-
-pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGStackedBar.pdf", height = 8, width = 12)
-plot_grid(plots[[1]],plots[[2]], plots[[3]], ncol =1, align = "v", axis = "b", rel_heights = c(0.5,1,1))
-dev.off()
-
-pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGTrueVSPredicted.pdf", height = 4, width = 6)
-TrueVSPredictedPlot(pred, bulkPheno)
-dev.off()
-
-
+# ## make model
+# model150CG = pickCompProbes(rawbetas = as.matrix(betas),
+#                             cellTypes = levels(as.factor(pheno$Sample.Type)),
+#                             cellInd = as.factor(pheno$Sample.Type),
+#                             numProbes =  150,
+#                             probeSelect = "auto")
+# 
+# ## simulate 15 samples with random proportions
+# bulk = CellTypeProportionSimulator(betastest, phenotest, "Sample.Type", 15)
+# bulkBetas = bulk[[1]]
+# bulkPheno = bulk[[2]]
+# 
+# 
+# ## keep only CpGs in model in bulkBetas
+# bulkBetasCG = GetModelCG(bulkBetas, list(model150CG = model150CG))  
+# 
+# ## predict proportions
+# pred = projectCellTypeWithError(bulkBetasCG, model150CG$coefEsts)
+# 
+# # pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGErrorResidual.pdf", height = 4, width = 6)
+# # p2 = PredictionErrorAndResiduals(model150CG, bulkBetasCG, bulkPheno)
+# # dev.off()
+# 
+# # plots = ModelCompareStackedBar(bulkBetas, list(model150CG = model150CG), trueComparison = T, trueProportions = bulkPheno)
+# # 
+# # pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGStackedBar.pdf", height = 8, width = 12)
+# # plot_grid(plots[[1]],plots[[2]], plots[[3]], ncol =1, align = "v", axis = "b", rel_heights = c(0.5,1,1))
+# # dev.off()
+# 
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGTrueVSPredicted.pdf", height = 4, width = 6)
+# p1 = TrueVSPredictedPlot(pred, bulkPheno)
+# dev.off()
+# 
+# legend <- get_legend(
+#   # create some space to the left of the legend
+#   p1 + theme(legend.box.margin = margin(0, 0, 0, 12))
+# )
+# 
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGComboPlots.pdf", height = 4, width = 11)
+# plot_grid(p1 + theme(legend.position="none"),
+#           p2 + theme(legend.position="none"),
+#           legend,
+#           rel_widths = c(1,1,0.5),
+#           ncol = 3,
+#           labels = c("A", "B", ""))
+# dev.off()
 
 ## Create models using 3:n cell types #################
 
@@ -245,7 +337,7 @@ load("/mnt/data1/Thea/ErrorMetric/data/VaryNCellsData.Rdata")
 x = stackedPlots[[1]]$data
 levels(as.factor(stackedPlots[[1]]$data$model))
 
-## add columns for which cell types in each data set adn tehn compare specific models
+## add columns for which cell types in each data set and then compare specific models
 modelPresent = matrix(ncol = length(cellTypes), nrow = nrow(x), data = 0)
 colnames(modelPresent) = cellTypeShorthand
 
@@ -384,6 +476,8 @@ model = pickCompProbes(rawbetas = as.matrix(betas),
                        numProbes =  150,
                        probeSelect = "auto")
 
+save(model, file = "/mnt/data1/Thea/ErrorMetric/data/ERiskModel5CellTypes150CpG.Rdata")
+
 ## create simulated samples with increasing noise
 testData = CellTypeProportionSimulator(betas = betastest, 
                                        pheno = phenotest, 
@@ -502,4 +596,36 @@ ggplot(plotDat, aes(x = cellType, y = error, fill = cellType)) +
   geom_violin() +
   theme_cowplot(18) +
   theme(legend.position = "none") +
-  labs(x = "Cell type", y = "Error")
+  labs(x = element_blank(), y = "Error")
+
+### Check error with increased missingness of test data ####
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDatatest.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/data/ERiskModel5CellTypes150CpG.Rdata")
+
+## subset betas to include only those in the model
+subBetas = GetModelCG(betastest, list(model))
+
+
+## create function to add x NAs to betas
+MakeNAsInBetas = function(proportionNA, betas){
+  nToBeNA = floor(nrow(betas)*proportionNA)
+  NAIndex = sample(nrow(betas), nToBeNA)
+  betas[NAIndex,] = NA
+  return(betas)
+}
+
+propMissing = seq(0,0.9,0.05)
+x = lapply(propMissing, MakeNAsInBetas, subBetas)
+
+plotDat = ErrorAcrossDataSets(x, model)
+
+ggplot(plotDat, aes(x = as.factor(nCGmissing), y = error)) +
+  geom_boxplot() +
+  theme_cowplot(18) +
+  scale_x_discrete(labels = propMissing) +
+  labs(x = "Proportion of CpGs missing", y = "Error")
+  
+
+

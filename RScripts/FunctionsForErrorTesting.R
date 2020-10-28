@@ -498,4 +498,23 @@ TrueVSPredictedPlot = function(pred, true){
 
 
 
+### ErrorAcrossDataSets ###############################
 
+##  INPUT: list of data sets with nCG from model
+##         model to be applied
+
+## OUTPUT: error per dataset in one data frame
+
+# ## test data
+# dataList = x
+# i = 2
+
+ErrorAcrossDataSets = function(dataList, model){
+  
+  outDat = matrix(ncol = 7, nrow = 0)
+  for (i in 1:length(dataList)){
+    outDat = rbind(outDat, projectCellTypeWithError(YIN = GetModelCG(dataList[[i]], list(model)), 
+                             coefCellTypeIN = model[["coefEsts"]]))
+  }
+  return(as.data.frame(outDat))
+}
