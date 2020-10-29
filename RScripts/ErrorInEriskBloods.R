@@ -6,7 +6,7 @@
 path = "/mnt/data1/Thea/ErrorMetric/"
 
 ## ISCA file path
-# path = 
+path = "/gpfs/ts0/projects/Research_Project-191406/ErrorMetric/"
 
 ## get stats on samples #####
 load("/mnt/data1/Eilis/Projects/Asthma/CellTypeComparisons/Correlations_New/BetasSortedByCellType_NoY.rdat")
@@ -301,7 +301,6 @@ cellTypeShorthand = c("B", "C4", "C8", "G", "M")
 ## load the models
 load(paste(path, "data/VaryNCellsData.Rdata", sep = ""))
 x = stackedPlots[[1]]$data
-# levels(as.factor(stackedPlots[[1]]$data$model))
 
 ## add columns for which cell types in each data set and then compare specific models
 modelPresent = matrix(ncol = length(cellTypes), nrow = nrow(x), data = 0)
@@ -317,20 +316,29 @@ plotDat = data.frame(x,modelPresent, sums = y)
 ## colour by number of cells in model
 plotDatBox = spread(plotDat, key = c(cellType), value = c(proportion_pred))
 
-save(plotDatBox, file = paste(path, "data/boxplotDat.Rdata", sep = ""))
-### TO DO IN ISCA #####################################
-load(paste(path, "data/boxplotDat.Rdata", sep = ""))
-library(ggpubr)
 ggplot(plotDatBox, aes(x = as.factor(sums), y = error, fill = as.factor(sums))) +
   geom_boxplot() +
   geom_jitter() +
   theme_cowplot(18) +
   labs(x = "Number of cell types in the model", y = "Error") +
-  ylim(c(0, max(plotDat$error))) +
+  ylim(c(0, max(plotDatBox$error))) +
   theme(legend.position = "none") 
 
+save(plotDatBox, file = paste(path, "data/boxplotDat.Rdata", sep = ""))
+### TO DO IN ISCA #####################################
+load(paste(path, "data/boxplotDat.Rdata", sep = ""))
+library(ggpubr)
 
-# ggboxplot()
+my_comparisons <- list( c("5", "4"), c("5", "3"), c("5", "2") )
+  
+pdf(file = paste(path, "plots/cellTypesInModel/nCellTypeBoxplot.pdf", sep = ""), height = 6, width = 7)
+ggboxplot(plotDatBox, y = "error", x = "sums", fill = "sums") +
+  stat_compare_means(comparisons = my_comparisons, label = "p.signif") +
+  theme_cowplot(18) +
+  geom_jitter() +
+  labs(x = "Number of cell types in the model", y = "Error") +
+  theme(legend.position = "none")
+dev.off()
 
 #######################################################
 
@@ -352,16 +360,22 @@ models4Compared = ModelCompareStackedBar(bulk[[1]],
                                          nCpGPlot = F,
                                          sampleNamesOnPlots = F)
 
-## TO DO IN ISCA ########################################
+modelNames = levels(as.factor(as.character(plotDat4$model)))
+wantedModelNames = sapply(strsplit(modelNames, "_"), function(x){return(x[[2]])})
+
+
+pdf(file = paste(path, "plots/cellTypesInModel/4CellTypeBoxplot.pdf", sep = ""), height = 6, width = 7)
 ggplot(plotDat4, aes(x = model, y = error, fill = model))+
   geom_boxplot() +
   geom_jitter() +
   theme_cowplot(18) +
+  scale_x_discrete(breaks=modelNames,
+                   labels=wantedModelNames) +
   labs(x = "Model", y = "Error") +
   theme(legend.position = "none") +
   ylim(c(0, max(plotDat$error)))
+dev.off()
 
-#########################################################
 
 stacks = plot_grid(models4Compared[[7]] + theme(legend.position = "none"),
           models4Compared[[3]] + theme(legend.position = "none"),
