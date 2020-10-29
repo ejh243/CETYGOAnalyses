@@ -497,6 +497,44 @@ TrueVSPredictedPlot = function(pred, true){
 }
 
 
+### TrueVSPredictedMaintainCellsPlot ###############################
+
+
+##  INPUT: pred - predicted cell types
+##         true - true proportions
+##         cells = c(T,T,T,T,T) vector of 5 booleans to show which cell type in factor are present
+
+## OUTPUT: plot true vs pred
+
+# ## test data
+# pred = CD4Model
+# true = C4C8bulk
+# cells = c(T,T,F,T,T)
+
+
+TrueVSPredictedMaintainCellsPlot = function(pred, true, cells = c(T,T,T,T,T), ylabel = "Actual"){
+  
+  shapeOptions = c(16, 17, 15, 3, 7)
+  shapes = shapeOptions[cells]
+  
+  colourOptions = hue_pal()(5)
+  colours = colourOptions[cells]
+  
+  plotDat = cbind.data.frame(gather(data.frame(pred), key = "cellType", value = "proportion_pred", 
+                                    -one_of(c("error","nCGmissing"))),
+                             gather(data.frame(true), key = "cellType_true", value = "proportion_true"))
+  
+  
+  print(ggplot(plotDat, aes(x = proportion_pred, y = proportion_true, col = cellType, shape = cellType)) +
+          geom_point() +
+          theme_cowplot(18) +
+          labs(x= "Predicted", y = ylabel, shape = "Cell type", col = "Cell type") +
+          scale_shape_manual(values=shapes) +
+          scale_color_manual(values=colours))
+  
+}
+
+
 
 ### ErrorAcrossDataSets ###############################
 

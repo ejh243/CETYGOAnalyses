@@ -2,6 +2,12 @@
 ## Dorothea Seiler Vellame
 ## started 09-10-2020
 
+## knight file path 
+path = "/mnt/data1/Thea/ErrorMetric/"
+
+## ISCA file path
+# path = 
+
 ## get stats on samples #####
 load("/mnt/data1/Eilis/Projects/Asthma/CellTypeComparisons/Correlations_New/BetasSortedByCellType_NoY.rdat")
 
@@ -14,14 +20,14 @@ for(i in 1:8){
   tableOfSamples[which(is.na(allphenos[[i]][,"PatientID"])),i+1] = 0
 }
  
-load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataFull.Rdata")
+load(paste(path, "data/bloodEriskDataFull.Rdata", sep = ""))
 
 trainTestInfo = unique(bloodPheno[,c("PatientID", "traintest")])
 tableOfSamples$Train[which(tableOfSamples$Sample %in% trainTestInfo[which(trainTestInfo$traintest == "train"),1])] = 1
 tableOfSamples$Test[which(tableOfSamples$Sample %in% trainTestInfo[which(trainTestInfo$traintest == "test"),1])] = 1
   
 tableOfSamples = rbind.data.frame(tableOfSamples, c("Total", colSums(tableOfSamples[,2:ncol(tableOfSamples)])))
-write.csv(tableOfSamples, file = "/mnt/data1/Thea/ErrorMetric/data/tableOfERiskSamples.csv")
+write.csv(tableOfSamples, file = paste(path, "data/tableOfERiskSamples.csv", sep = ""))
   
 ## QC original data ###################################
 ## make PCAs, remove non blood data and NA samples
@@ -57,7 +63,7 @@ for (i in 2:6){
 library(ggplot2)
 library(cowplot)
 
-# pdf("/mnt/data1/Thea/ErrorMetric/plots/createTrainTest/predictedAgeAcrossAllCellTypes.pdf", height = 5, width = 8)
+# pdf(paste(path, "plots/createTrainTest/predictedAgeAcrossAllCellTypes.pdf", sep = ""), height = 5, width = 8)
 # ggplot(bloodphenomerge, aes(x = PatientID, y = PredictedAge, col = Sample.Type)) +
 #   geom_point() +
 #   theme_cowplot() +
@@ -82,7 +88,7 @@ trainFIndex = which(wholebloodphenomerge$sex =="F")[which(!which(wholebloodpheno
 wholebloodphenomerge[c(trainMIndex, trainFIndex),5] = "train" 
 wholebloodphenomerge[c(testMIndex, testFIndex),5] = "test"
 
-# pdf("/mnt/data1/Thea/ErrorMetric/plots/createTrainTest/trainTestSamplesAcrossPredictedAgeAndSex.pdf", height = 5, width = 5)
+# pdf(paste(path, "plots/createTrainTest/trainTestSamplesAcrossPredictedAgeAndSex.pdf", sep = ""), height = 5, width = 5)
 # ggplot(wholebloodphenomerge, aes(x = sex, y = PredictedAge, col = V5)) +
 #   geom_jitter(width = 0.3, size = 2) +
 #   theme_cowplot() +
@@ -119,7 +125,7 @@ for  (i in 1:length(bloodbeta)){
     labs(col = "")
 }
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/createTrainTest/PCAPerCellTypeTrainTest.pdf", height = 6, width = 15)
+pdf(paste(path, "plots/createTrainTest/PCAPerCellTypeTrainTest.pdf", sep = ""), height = 6, width = 15)
 plot_grid(plotL[[1]], 
           plotL[[2]], 
           plotL[[3]], 
@@ -156,7 +162,7 @@ bloodPheno[which(bloodPheno$Sample.Type == "B-cells"), "Sample.Type"] = "B_cells
 
 ## save blood data
 save(bloodBeta, bloodPheno,
-     file = "/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataFull.Rdata")
+     file = paste(path, "data/bloodEriskDataFull.Rdata", sep = ""))
 
 ## save train and test data
 betas = bloodBeta[,intersect(which(bloodPheno$traintest == "train"), which(bloodPheno$Sample.Type != "whole blood"))]
@@ -166,9 +172,9 @@ pheno = bloodPheno[intersect(which(bloodPheno$traintest == "train"), which(blood
 phenotest = bloodPheno[intersect(which(bloodPheno$traintest == "test"), which(bloodPheno$Sample.Type != "whole blood")),]
 
 save(betas, pheno,
-     file = "/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
+     file = paste(path, "data/bloodEriskDataTrain.Rdata", sep = ""))
 save(betastest, phenotest,
-     file = "/mnt/data1/Thea/ErrorMetric/data/bloodEriskDatatest.Rdata")
+     file = paste(path, "data/bloodEriskDatatest.Rdata", sep = ""))
 
 
 
@@ -180,10 +186,10 @@ save(betastest, phenotest,
 
 ## Verify that 150 CpG per cell type is enough ########
 ## Don't include plots with error as that's not in the narative yet! This should just show that 150 is more than enough
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
-load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
-load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDatatest.Rdata")
+source(paste(path, "RScripts/FunctionsForBrainCellProportionPrediction.r", sep = ""))
+source(paste(path, "RScripts/FunctionsForErrorTesting.R", sep = ""))
+load(paste(path, "data/bloodEriskDataTrain.Rdata", sep = ""))
+load(paste(path, "data/bloodEriskDatatest.Rdata", sep = ""))
 
 ## Plot number of CpGs vs correlation between actual & pred 
 ## make models 
@@ -197,6 +203,11 @@ for (i in 1:length(cpg)) {
                                      probeSelect = "auto")
   names(modelListCpG)[i] = paste("model", cpg[i], "CG", sep = "")
 }
+
+## save model list
+save(modelListCpG, file = paste(path, "data/CpGModels.Rdata", sep = ""))
+
+load (paste(path, "data/CpGModels.Rdata", sep = ""))
 
 ## simulate 40 bulk samples
 bulk = CellTypeProportionSimulator(betastest, phenotest, "Sample.Type", 40)
@@ -228,7 +239,7 @@ p2 = truevpred[[which(cpg == 150)]]
 ## cor of p2
 corDat[which(cpg == 150)]
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGComboPlots.pdf", height = 4, width = 11)
+pdf(paste(path, "plots/accuracyOf150CGModel/model150CGComboPlots.pdf", sep = ""), height = 4, width = 11)
 plot_grid(p1,
           p2,
           rel_widths = c(1,1.35),
@@ -236,52 +247,7 @@ plot_grid(p1,
           labels = "AUTO")
 dev.off()
 
-# ## make model
-# model150CG = pickCompProbes(rawbetas = as.matrix(betas),
-#                             cellTypes = levels(as.factor(pheno$Sample.Type)),
-#                             cellInd = as.factor(pheno$Sample.Type),
-#                             numProbes =  150,
-#                             probeSelect = "auto")
-# 
-# ## simulate 15 samples with random proportions
-# bulk = CellTypeProportionSimulator(betastest, phenotest, "Sample.Type", 15)
-# bulkBetas = bulk[[1]]
-# bulkPheno = bulk[[2]]
-# 
-# 
-# ## keep only CpGs in model in bulkBetas
-# bulkBetasCG = GetModelCG(bulkBetas, list(model150CG = model150CG))  
-# 
-# ## predict proportions
-# pred = projectCellTypeWithError(bulkBetasCG, model150CG$coefEsts)
-# 
-# # pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGErrorResidual.pdf", height = 4, width = 6)
-# # p2 = PredictionErrorAndResiduals(model150CG, bulkBetasCG, bulkPheno)
-# # dev.off()
-# 
-# # plots = ModelCompareStackedBar(bulkBetas, list(model150CG = model150CG), trueComparison = T, trueProportions = bulkPheno)
-# # 
-# # pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGStackedBar.pdf", height = 8, width = 12)
-# # plot_grid(plots[[1]],plots[[2]], plots[[3]], ncol =1, align = "v", axis = "b", rel_heights = c(0.5,1,1))
-# # dev.off()
-# 
-# pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGTrueVSPredicted.pdf", height = 4, width = 6)
-# p1 = TrueVSPredictedPlot(pred, bulkPheno)
-# dev.off()
-# 
-# legend <- get_legend(
-#   # create some space to the left of the legend
-#   p1 + theme(legend.box.margin = margin(0, 0, 0, 12))
-# )
-# 
-# pdf("/mnt/data1/Thea/ErrorMetric/plots/accuracyOf150CGModel/model150CGComboPlots.pdf", height = 4, width = 11)
-# plot_grid(p1 + theme(legend.position="none"),
-#           p2 + theme(legend.position="none"),
-#           legend,
-#           rel_widths = c(1,1,0.5),
-#           ncol = 3,
-#           labels = c("A", "B", ""))
-# dev.off()
+
 
 ## Create models using 3:n cell types #################
 
@@ -292,9 +258,9 @@ dev.off()
 ## G = Granulocytes
 ## M = Monocytes
 
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
-load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
+source(paste(path, "RScripts/FunctionsForBrainCellProportionPrediction.r", sep = ""))
+source(paste(path, "RScripts/FunctionsForErrorTesting.R", sep = ""))
+load(paste(path, "data/bloodEriskDataTrain.Rdata", sep = ""))
 
 ## make design matrix of booleans for which cell type will be present
 designMatrix = expand.grid(c(T,F), c(T,F), c(T,F), c(T,F), c(T,F))
@@ -315,7 +281,7 @@ cellTypeShorthand = c("B", "C4", "C8", "G", "M")
 #   names(modelList)[i] = paste("model", paste(cellTypeShorthand[unlist(designMatrix[i,])], sep = "", collapse = ""), sep = "_")
 # }
 # 
-# save(modelList, file = "/mnt/data1/Thea/ErrorMetric/data/VaryNCellsData.Rdata")
+# save(modelList, file = paste(path, "data/VaryNCellsData.Rdata", sep = ""))
 # 
 # bulk = CellTypeProportionSimulator(GetModelCG(betas, modelList),
 #                             pheno,
@@ -330,12 +296,12 @@ cellTypeShorthand = c("B", "C4", "C8", "G", "M")
 #                            trueComparison = T,
 #                            trueProportions = bulk[[2]])
 # 
-# save(modelList, bulk, stackedPlots, file = "/mnt/data1/Thea/ErrorMetric/data/VaryNCellsData.Rdata")
+# save(modelList, bulk, stackedPlots, file = paste(path, "data/VaryNCellsData.Rdata", sep = ""))
 
 ## load the models
-load("/mnt/data1/Thea/ErrorMetric/data/VaryNCellsData.Rdata")
+load(paste(path, "data/VaryNCellsData.Rdata", sep = ""))
 x = stackedPlots[[1]]$data
-levels(as.factor(stackedPlots[[1]]$data$model))
+# levels(as.factor(stackedPlots[[1]]$data$model))
 
 ## add columns for which cell types in each data set and then compare specific models
 modelPresent = matrix(ncol = length(cellTypes), nrow = nrow(x), data = 0)
@@ -348,18 +314,13 @@ for(i in 1:5){
 y = rowSums(modelPresent)
 plotDat = data.frame(x,modelPresent, sums = y)
 
-
 ## colour by number of cells in model
-ggplot(plotDat, aes(x = sample, y = error, col = as.factor(sums), size = as.factor(sums))) +
-  geom_point(alpha = 0.8) +
-  theme_cowplot(18) +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank()) +
-  labs(x = "Sample", y = "Error", col = "Number of\ncelltypes in\nthe model", size = "Number of\ncelltypes in\nthe model") +
-  ylim(c(0, max(plotDat$error)))
-
 plotDatBox = spread(plotDat, key = c(cellType), value = c(proportion_pred))
+
+save(plotDatBox, file = paste(path, "data/boxplotDat.Rdata", sep = ""))
+### TO DO IN ISCA #####################################
+load(paste(path, "data/boxplotDat.Rdata", sep = ""))
+library(ggpubr)
 ggplot(plotDatBox, aes(x = as.factor(sums), y = error, fill = as.factor(sums))) +
   geom_boxplot() +
   geom_jitter() +
@@ -368,8 +329,11 @@ ggplot(plotDatBox, aes(x = as.factor(sums), y = error, fill = as.factor(sums))) 
   ylim(c(0, max(plotDat$error))) +
   theme(legend.position = "none") 
 
-# library(ggpubr)
+
 # ggboxplot()
+
+#######################################################
+
 
 ## general Q: 
 ## why do some still predict well? low proportion of that cell type? cell type less important?
@@ -388,6 +352,7 @@ models4Compared = ModelCompareStackedBar(bulk[[1]],
                                          nCpGPlot = F,
                                          sampleNamesOnPlots = F)
 
+## TO DO IN ISCA ########################################
 ggplot(plotDat4, aes(x = model, y = error, fill = model))+
   geom_boxplot() +
   geom_jitter() +
@@ -396,20 +361,25 @@ ggplot(plotDat4, aes(x = model, y = error, fill = model))+
   theme(legend.position = "none") +
   ylim(c(0, max(plotDat$error)))
 
-models4Compared[[1]]
+#########################################################
 
-plot_grid(models4Compared[[7]],
-          models4Compared[[3]],
-          models4Compared[[4]], 
+stacks = plot_grid(models4Compared[[7]] + theme(legend.position = "none"),
+          models4Compared[[3]] + theme(legend.position = "none"),
+          models4Compared[[4]] + theme(legend.position = "none"),
+          models4Compared[[5]] + theme(legend.position = "none"),
+          models4Compared[[6]] + theme(legend.position = "none"), 
+          models4Compared[[2]] + theme(legend.position = "none"),
+          labels = "AUTO",
           ncol = 1)
 
-plot_grid(models4Compared[[7]],
-          models4Compared[[5]],
-          models4Compared[[6]], 
-          ncol = 1)
+leg = get_legend(models4Compared[[7]] + theme(legend.position=c(0.15,0.8),
+                                              legend.direction = "horizontal", legend.title = element_blank()))
 
-plot_grid(models4Compared[[7]],
-          models4Compared[[2]], ncol = 1)
+pdf(paste(path, "plots/cellTypesInModel/stackedNCellTypes.pdf", sep = ""), height = 16, width = 12)
+plot_grid(stacks, leg, rel_heights = c(0.9,0.05), ncol = 1)
+dev.off()
+
+
 
 ## plot if the sum of CD4 and 8 are the same in models without them
 C4C8bulk = data.frame(bulk[[2]])
@@ -419,16 +389,11 @@ C4C8bulk = C4C8bulk[,c(1,4,2,3)]
 
 CD4Model = plotDat4[which(plotDat4$model == "model_BC4GM"),c(1, 2, 3, 11, 12, 14, 15)]
 CD4Model = CD4Model[match(rownames(C4C8bulk), CD4Model$sample),-3]
-colnames(CD4Model)[4] = "CD4_CD8"
-CD4Plot = TrueVSPredictedPlot(CD4Model, C4C8bulk)
+CD4Plot = TrueVSPredictedMaintainCellsPlot(CD4Model, C4C8bulk, c(T,T,F,T,T), ylabel = "Actual (CD4 = CD4 + CD8)")
 
 CD8Model = plotDat4[which(plotDat4$model == "model_BC8GM"),c(1, 2, 3, 11, 13, 14, 15)]
 CD8Model = CD8Model[match(rownames(C4C8bulk), CD8Model$sample),-3]
-colnames(CD8Model)[4] = "CD4_CD8"
-CD8Plot = TrueVSPredictedPlot(CD8Model, C4C8bulk)
-
-plot_grid(CD4Plot, CD8Plot, ncol = 1, labels = c("CD8 missing", "CD4 missing"))
-
+CD8Plot = TrueVSPredictedMaintainCellsPlot(CD8Model, C4C8bulk, c(T,F,T,T,T), ylabel = "Actual (CD8 = CD4 + CD8)")
 
 ## plot if the sum of CD4 and 8 are the same in models without them
 MGbulk = data.frame(bulk[[2]])
@@ -437,37 +402,49 @@ MGbulk = MGbulk[,-c(4,5)]
 
 MModel = plotDat4[which(plotDat4$model == "model_BC4C8M"),c(1, 2, 3, 11, 12, 13, 15)]
 MModel = MModel[match(rownames(MGbulk), MModel$sample),-3]
-colnames(MModel)[6] = "M_G"
-MPlot = TrueVSPredictedPlot(MModel, MGbulk)
+MPlot = TrueVSPredictedMaintainCellsPlot(MModel, MGbulk, c(T,T,T,F,T), ylabel = "Actual (M = M + G)")
 
 GModel = plotDat4[which(plotDat4$model == "model_BC4C8G"),c(1, 2, 3, 11, 12, 13, 14)]
 GModel = GModel[match(rownames(MGbulk), GModel$sample),-3]
-colnames(GModel)[4] = "M_G"
-GPlot = TrueVSPredictedPlot(GModel, MGbulk)
+GPlot = TrueVSPredictedMaintainCellsPlot(GModel, MGbulk, c(T,T,T,T,F), ylabel = "Actual (G = M + G)")
 
 
-plot_grid(MPlot, GPlot, ncol = 1, labels = c("Granulocytes missing", "Monocytes missing"))
+missingCellPlot = plot_grid(CD4Plot + ggtitle("CD8 missing") + theme(legend.position = "none"), 
+          CD8Plot + ggtitle("CD4 missing") + theme(legend.position = "none"), 
+          MPlot + ggtitle("Granulocytes missing") + theme(legend.position = "none"), 
+          GPlot + ggtitle("Monocytes missing") + theme(legend.position = "none"), 
+          ncol = 2, 
+          labels = c("Ai", "Aii", "Bi", "Bii"))
 
+## make legend 
+plotForLeg = ggplot(x, aes(x = error, y = proportion_pred)) +
+  geom_point(aes(shape = as.factor(cellType), col = as.factor(cellType))) +
+  theme_cowplot(18)
+leg = get_legend(plotForLeg + theme(legend.direction = "horizontal", legend.title = element_blank())) 
+
+pdf(paste(path, "plots/cellTypesInModel/cellTypeReplacement4cell.pdf", sep = ""), height = 8, width = 9)
+plot_grid(missingCellPlot, leg, ncol = 1, rel_heights = c(1,0.05))
+dev.off()
 
 ## compare true proportion of B cell to error in model without B cells
 BModel = plotDat4[which(plotDat4$model == "model_C4C8GM"),]
 BModel = BModel[match(rownames(bulk[[2]]), BModel$sample),]
 BModelCompare = cbind.data.frame(error = BModel$error, B_cells = as.data.frame(bulk[[2]])$B_cells)
 
-
+pdf(paste(path, "plots/cellTypesInModel/cellTypeBModel4cell.pdf", sep = ""), height = 6, width = 6)
 ggplot(BModelCompare, aes(x = B_cells, y = error)) +
   geom_point(size = 2) +
   theme_cowplot(18) +
   labs(x = "Proportion of B cells", y = "Error")
-
+dev.off()
 
 
 
 ### Compare error when data contains noise ############
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
-load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
-load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDatatest.Rdata")
+source(paste(path, "RScripts/FunctionsForBrainCellProportionPrediction.r", sep = ""))
+source(paste(path, "RScripts/FunctionsForErrorTesting.R", sep = ""))
+load(paste(path, "data/bloodEriskDataTrain.Rdata", sep = ""))
+load(paste(path, "data/bloodEriskDatatest.Rdata", sep = ""))
 
 ## create model with all 5 cell types and 150 CpGs
 model = pickCompProbes(rawbetas = as.matrix(betas),
@@ -476,7 +453,7 @@ model = pickCompProbes(rawbetas = as.matrix(betas),
                        numProbes =  150,
                        probeSelect = "auto")
 
-save(model, file = "/mnt/data1/Thea/ErrorMetric/data/ERiskModel5CellTypes150CpG.Rdata")
+save(model, file = paste(path, "data/ERiskModel5CellTypes150CpG.Rdata", sep = ""))
 
 ## create simulated samples with increasing noise
 testData = CellTypeProportionSimulator(betas = betastest, 
@@ -531,10 +508,10 @@ ggplot(NEDat, aes(x = noise, y = error)) +
 
 
 ### Compare whole blood, simulated and buccal predictions of blood cell types ###### 
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
-load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDataTrain.Rdata")
-load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDatatest.Rdata")
+source(paste(path, "RScripts/FunctionsForBrainCellProportionPrediction.r", sep = ""))
+source(paste(path, "RScripts/FunctionsForErrorTesting.R", sep = ""))
+load(paste(path, "data/bloodEriskDataTrain.Rdata", sep = ""))
+load(paste(path, "data/bloodEriskDatatest.Rdata", sep = ""))
 load("/mnt/data1/Eilis/Projects/Asthma/CellTypeComparisons/Correlations_New/BetasSortedByCellType_NoY.rdat")
 
 ## create model with all 5 cell types and 150 CpGs
@@ -599,10 +576,10 @@ ggplot(plotDat, aes(x = cellType, y = error, fill = cellType)) +
   labs(x = element_blank(), y = "Error")
 
 ### Check error with increased missingness of test data ####
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForBrainCellProportionPrediction.r")
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
-load("/mnt/data1/Thea/ErrorMetric/data/bloodEriskDatatest.Rdata")
-load("/mnt/data1/Thea/ErrorMetric/data/ERiskModel5CellTypes150CpG.Rdata")
+source(paste(path, "RScripts/FunctionsForBrainCellProportionPrediction.r", sep = ""))
+source(paste(path, "RScripts/FunctionsForErrorTesting.R", sep = ""))
+load(paste(path, "data/bloodEriskDatatest.Rdata", sep = ""))
+load(paste(path, "data/ERiskModel5CellTypes150CpG.Rdata", sep = ""))
 
 ## subset betas to include only those in the model
 subBetas = GetModelCG(betastest, list(model))
