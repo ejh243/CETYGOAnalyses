@@ -352,6 +352,9 @@ plotDat4 = plotDatBox[plotDatBox$sums == 4, ]
 model4Index = which(rowSums(designMatrix) == 4)
 models4 = modelList[model4Index]
 
+wantedModelNames = sapply(strsplit(names(models4), "_"), function(x){return(x[[2]])})
+names(models4) = wantedModelNames
+
 models4Compared = ModelCompareStackedBar(bulk[[1]], 
                                          modelList = models4, 
                                          trueComparison = T,
@@ -360,8 +363,7 @@ models4Compared = ModelCompareStackedBar(bulk[[1]],
                                          nCpGPlot = F,
                                          sampleNamesOnPlots = F)
 
-modelNames = levels(as.factor(as.character(plotDat4$model)))
-wantedModelNames = sapply(strsplit(modelNames, "_"), function(x){return(x[[2]])})
+
 
 
 pdf(file = paste(path, "plots/cellTypesInModel/4CellTypeBoxplot.pdf", sep = ""), height = 6, width = 7)
