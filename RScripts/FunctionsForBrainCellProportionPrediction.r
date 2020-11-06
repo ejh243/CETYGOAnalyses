@@ -125,7 +125,7 @@ pickCompProbes <- function(rawbetas, cellInd, cellTypes = NULL, numProbes = 50, 
     })
   }
 
-  trainingProbes <- unique(unlist(probeList))
+  trainingProbes <- na.omit(unique(unlist(probeList)))
   rawbetas <- rawbetas[trainingProbes,]
 
   pMeans <- colMeans(rawbetas)
