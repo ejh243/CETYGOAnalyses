@@ -55,6 +55,13 @@ CellTypeSubsetBetasAndPheno = function(cellTypeNames, betas, pheno, phenoColName
 ## calculates a row of random proportions that sum to totalProportion/100
 ## if random is included totalProportion should be 100-proportionNoise 
 randomNSumToProp = function(totalProportion = 100, n ){
+  
+  if(n==2){
+    x = sample(100,1)
+    prop = c(x/100, (100-x)/100)
+    return(prop)
+  }
+  
   x = sample(totalProportion+n-1, n-1)
   x = sort(x)
   prop = c(x[1] - 1)
