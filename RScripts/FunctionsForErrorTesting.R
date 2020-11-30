@@ -497,9 +497,9 @@ TrueVSPredictedPlot = function(pred, true){
   
   
   print(ggplot(plotDat, aes(x = proportion_pred, y = proportion_true, col = cellType, shape = cellType)) +
-    geom_point() +
-    theme_cowplot(18) +
-    labs(x= "Predicted", y = "Actual", shape = "Cell type", col = "Cell type"))
+          geom_point() +
+          theme_cowplot(18) +
+          labs(x= "Predicted", y = "Actual", shape = "Cell type", col = "Cell type"))
   
 }
 
@@ -559,7 +559,30 @@ ErrorAcrossDataSets = function(dataList, model){
   outDat = matrix(ncol = 7, nrow = 0)
   for (i in 1:length(dataList)){
     outDat = rbind(outDat, projectCellTypeWithError(YIN = GetModelCG(dataList[[i]], list(model)), 
-                             coefCellTypeIN = model[["coefEsts"]]))
+                                                    coefCellTypeIN = model[["coefEsts"]]))
   }
   return(as.data.frame(outDat))
 }
+
+
+### singleCellProportionMatrix ########################
+## Function for proportion matrix from single cell type samples
+
+##  INPUT: phenoCol
+
+## OUTPUT: cell type matrix
+
+singleCellProportionMatrix = function(phenoCellCol){
+  celltypes = levels(as.factor(phenoCellCol))
+  mat = matrix(nrow = length(phenoCellCol), ncol = length(celltypes), data = 0)
+  for (i in 1: length(celltypes)) {
+    mat[phenoCellCol == celltypes[i],i] = 1
+  }
+  colnames(mat) = celltypes
+  return(mat)
+}
+
+
+
+
+### Function for proportion matrix for x% step for each sample
