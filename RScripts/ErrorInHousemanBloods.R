@@ -177,6 +177,33 @@ save(HousemanBlood150CpGModel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models
 
 
 
+### Plot heirarchical cluster of training cpgs used in model #####
+## load model
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+
+## load data
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
+
+## load functions
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+modelBetas = GetModelCG(quantileBetasTrain, list(HousemanBlood150CpGModel))
+library(gplots)
+library(viridis)
+library(scales)
+library(ComplexHeatmap)
+
+# colours6 = hue_pal()(6)
+
+col = list(Celltype = c("Bcell" = "#F8766D", "CD4T" = "#B79F00",
+                        "CD8T" = "#00BA38",  "Gran" = "#00BFC4",
+                        "Mono" = "#619CFF",  "NK" = "#F564E3"))
+# Create the heatmap annotation
+ha <- HeatmapAnnotation(Celltype = phenoTrain$celltype,
+  col = col)
+
+Heatmap(modelBetas, name = "DNAm",
+          top_annotation = ha, show_row_names = F, show_column_names = F)
 
 
 ### check effect of normalisation #####################
@@ -233,6 +260,92 @@ ggplot(plotDat, aes(x = norm, y = diff)) +
   theme(legend.title = element_blank()) +
   ylim(c(-0.001,0.3)) +
   annotate("text", x = 1.5, y = 0.3, label = paste("p =", signif(ttest$p.value, 3)), size = 5)
+
+
+
+### create models using 3:6 cell types
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+## load data
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
+
+## make design matrix of booleans for which cell type will be present
+designMatrix = expand.grid(c(T,F), c(T,F), c(T,F), c(T,F), c(T,F), c(T,F))
+designMatrix = designMatrix[apply(designMatrix, 1, sum) >= 3,]
+
+cellTypes = c("Bcell", "CD4T", "CD8T", "Gran", "Mono", "NK")
+cellTypeShorthand = c("B", "C4", "C8", "G", "M", "NK")
+
+modelList = list()
+for (i in 1:nrow(designMatrix)){
+  modellingDat = CellTypeSubsetBetasAndPheno(cellTypes[unlist(designMatrix[i,])],
+                                             quantileBetasTrain, phenoTrain, phenoColName = "celltype", justBetas = F)
+  modelList[[i]] = pickCompProbes(rawbetas = as.matrix(modellingDat[[1]]),
+                                  cellTypes = levels(as.factor(as.character(modellingDat[[2]]$celltype))),
+                                  cellInd = as.factor(as.character(modellingDat[[2]]$celltype)),
+                                  numProbes =  150,
+                                  probeSelect = "auto")
+  names(modelList)[i] = paste("model", paste(cellTypeShorthand[unlist(designMatrix[i,])], sep = "", collapse = ""), sep = "_")
+}
+
+save(modelList, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+
+
+
+
+
+bulk = CellTypeProportionSimulator(GetModelCG(quantileBetasTest, modelList),
+                            phenoTest,
+                            phenoColName = "celltype",
+                            nBulk = 15,
+                            proportionsMatrixType = "random")
+
+stackedPlots = ModelCompareStackedBar(bulk[[1]],
+                           modelList,
+                           nCpGPlot = F,
+                           sampleNamesOnPlots = F,
+                           trueComparison = T,
+                           trueProportions = bulk[[2]])
+
+save(modelList, bulk, stackedPlots, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

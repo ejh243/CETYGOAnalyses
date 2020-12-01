@@ -586,3 +586,22 @@ singleCellProportionMatrix = function(phenoCellCol){
 
 
 ### Function for proportion matrix for x% step for each sample
+
+##  INPUT: cellLevels
+##         minimumProp
+##         maxProp
+##         stepSize
+
+
+minProp = 0
+maxProp = 0.3
+stepSize = 0.1
+
+
+steps = seq(minProp, maxProp, stepSize)
+
+x = expand.grid(steps, steps, steps, steps, steps, steps)
+x = x[which(rowSums(x) == 1),]
+
+
+
