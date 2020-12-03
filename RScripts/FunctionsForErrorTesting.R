@@ -108,7 +108,7 @@ randomNSumToProp = function(totalProportion = 100, n ){
 # CellTypeProportionSimulator(betas, pheno, phenoColName, nBulk, proportionsMatrix = "random")
 
 CellTypeProportionSimulator = function(betas, pheno, phenoColName, nBulk, 
-                                       proportionsMatrixType = "random", proportionsMatrix = NA, 
+                                       proportionsMatrixType = c("random","own"), proportionsMatrix = NA, 
                                        noiseIn = F, proportionNoise = NA){
   
   ## ensure that phenocol is a factor
@@ -163,7 +163,7 @@ CellTypeProportionSimulator = function(betas, pheno, phenoColName, nBulk,
   }
   
   bulk = sapply(1:nBulk, CalculateBulk)
-  colnames(bulk) = rownames(proportionsMatrix) = paste("S", 1:ncol(bulk), sep = "")
+  colnames(bulk) = rownames(proportionsMatrix) = paste("S", letters[seq(from = 1, to = ncol(bulk))], sep = "")
   rownames(bulk) = rownames(betas)
   
   return(list(bulk, proportionsMatrix))
@@ -225,7 +225,8 @@ GetModelCG = function(betas, modelList){
 
 PredictionErrorAndResiduals = function(model, testBetas, testPheno){
   
-  predictedPheno = projectCellTypeWithError(YIN = testBetas, coefCellTypeIN = model$coefEsts, sampleDup = 0)
+  predictedPheno = projectCellTypeWithError(YIN = testBetas, modelType = "ownModel",
+                                            ownModelData = model)
   
   x = gather(cbind.data.frame(predictedPheno, sample = rownames(predictedPheno)), key = "cellType", value = "proportion_pred", 
              -one_of(c("error","nCGmissing", "sample")))
@@ -239,7 +240,7 @@ PredictionErrorAndResiduals = function(model, testBetas, testPheno){
           geom_point(size = 2) +
           theme_cowplot(18) +
           ylim(c(0,max(plotDat$error)))+
-          labs(x = "|Actual - Predicted|", y = "Error", shape = "Cell type", col = "Cell type"))
+          labs(x = "|Actual - Predicted|", y = "DSRMSE", shape = "Cell type", col = "Cell type"))
 }
 
 
@@ -343,8 +344,9 @@ ModelCompareStackedBar = function(testBetas,
   predictions = data.frame(matrix(ncol = 6, nrow = 0))
   for(i in 1:length(modelList)){
     model = modelList[[i]]
-    newPred = projectCellTypeWithError(YIN = GetModelCG(testBetas, list(modelList[[i]])), 
-                                       coefCellTypeIN = model[["coefEsts"]])
+    newPred = projectCellTypeWithError(YIN = testBetas,
+                                       modelType = "ownModel",
+                                       ownModelData = model)
     newPred = cbind.data.frame(newPred, sample = rownames(newPred), model = names(modelList)[i])
     newPred = gather(newPred, key = "cellType", value = "proportion_pred", 
                      -one_of(c("error","nCGmissing", "sample", "model")))
@@ -358,7 +360,7 @@ ModelCompareStackedBar = function(testBetas,
       geom_point() +
       theme_cowplot(18) +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      labs(x = "Sample", y = "Error") +
+      labs(x = "Sample", y = "DSRMSE") +
       ylim(c(0, max(predictions$error)))
   }else{plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
     geom_point() +
@@ -366,7 +368,7 @@ ModelCompareStackedBar = function(testBetas,
     theme(axis.title.x=element_blank(),
           axis.text.x=element_blank(),
           axis.ticks.x=element_blank()) +
-    labs(x = "Sample", y = "Error") +
+    labs(x = "Sample", y = "DSRMSE") +
     ylim(c(0, max(predictions$error)))
   }
   
@@ -558,8 +560,9 @@ ErrorAcrossDataSets = function(dataList, model){
   
   outDat = matrix(ncol = 7, nrow = 0)
   for (i in 1:length(dataList)){
-    outDat = rbind(outDat, projectCellTypeWithError(YIN = GetModelCG(dataList[[i]], list(model)), 
-                                                    coefCellTypeIN = model[["coefEsts"]]))
+    outDat = rbind(outDat, projectCellTypeWithError(YIN = dataList[[i]], 
+                                                    modelType = "ownModel",
+                                                    ownModelData = model))
   }
   return(as.data.frame(outDat))
 }
@@ -584,24 +587,56 @@ singleCellProportionMatrix = function(phenoCellCol){
 
 
 
+### simPropMaker ######################################
+## Function for proportion matrix to be used in CellTypeProportionSimulator 
+## each cell type will be simulated with mean, mean +- sd, mean +- 0.5sd
 
-### Function for proportion matrix for x% step for each sample
+##  INPUT: meanBloodProp
+##         sdBloodProp
 
-##  INPUT: cellLevels
-##         minimumProp
-##         maxProp
-##         stepSize
+simPropMaker = function(meanBloodProp, sdBloodProp){
+  propMat = matrix(nrow = 5*6, ncol = 6)
+  for (i in 1:length(meanBloodProp)){
+    cellProps = c(meanBloodProp[i],
+                  meanBloodProp[i] + sdBloodProp[i],
+                  meanBloodProp[i] - sdBloodProp[i],
+                  meanBloodProp[i] + 0.5*sdBloodProp[i],
+                  meanBloodProp[i] - 0.5*sdBloodProp[i])
+    diffFrom100 = rep(100,5) - cellProps - sum(meanBloodProp[-i])
+    diffFrom100 = diffFrom100/5
+    for (j in 1:5){
+      propMat[(i-1)*5 + j,i] = cellProps[j]
+      propMat[(i-1)*5 + j,-i] = meanBloodProp[-i] + diffFrom100[j]
+    }
+  }
+  return(propMat/100)
+}
 
+### simPropMaker2 #####################################
+## Function for proportion matrix to be used in CellTypeProportionSimulator 
+## cell type selected has prop 0.1 - 1 the rest have their prop of the remaining
 
-minProp = 0
-maxProp = 0.3
-stepSize = 0.1
+##  INPUT: meanBloodProp
+##         celltypeBool = c(T,F,F,F,F,F) where the one with T is the one to change
 
-
-steps = seq(minProp, maxProp, stepSize)
-
-x = expand.grid(steps, steps, steps, steps, steps, steps)
-x = x[which(rowSums(x) == 1),]
-
+simPropMaker2 = function(meanBloodProp, celltypeBool = c(T,F,F,F,F,F), cellNames){
+  propMat = matrix(nrow = 10, ncol = 6)
+  # meanBloodProp = meanBloodProp
+  cellProps = seq(0.1, 1, 0.1)
+  diff = 1 - cellProps
+  propMat[,celltypeBool] = cellProps
+  
+  ## calc weight of each cell type on remaining prop
+  cellWeight = c()
+  for (i in 1:5){
+    cellWeight = c(cellWeight,meanBloodProp[!celltypeBool][i]/sum(meanBloodProp[!celltypeBool]))
+  }
+  
+  for(i in 1:length(cellProps)){
+    propMat[i,!celltypeBool] = diff[i]*cellWeight
+  }
+  colnames(propMat) = cellNames
+  return(propMat)
+}
 
 

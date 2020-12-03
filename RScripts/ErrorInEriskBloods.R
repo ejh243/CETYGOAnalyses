@@ -320,7 +320,7 @@ ggplot(plotDatBox, aes(x = as.factor(sums), y = error, fill = as.factor(sums))) 
   geom_boxplot() +
   geom_jitter() +
   theme_cowplot(18) +
-  labs(x = "Number of cell types in the model", y = "Error") +
+  labs(x = "Number of cell types in the model", y = "DSRMSE") +
   ylim(c(0, max(plotDatBox$error))) +
   theme(legend.position = "none") 
 
@@ -336,7 +336,7 @@ ggboxplot(plotDatBox, y = "error", x = "sums", fill = "sums") +
   stat_compare_means(comparisons = my_comparisons, label = "p.signif") +
   theme_cowplot(18) +
   geom_jitter() +
-  labs(x = "Number of cell types in the model", y = "Error") +
+  labs(x = "Number of cell types in the model", y = "DSRMSE") +
   theme(legend.position = "none")
 dev.off()
 
@@ -373,7 +373,7 @@ ggplot(plotDat4, aes(x = model, y = error, fill = model))+
   theme_cowplot(18) +
   scale_x_discrete(breaks=modelNames,
                    labels=wantedModelNames) +
-  labs(x = "Model", y = "Error") +
+  labs(x = "Model", y = "DSRMSE") +
   theme(legend.position = "none") +
   ylim(c(0, max(plotDat$error)))
 dev.off()
@@ -451,7 +451,7 @@ pdf(paste(path, "plots/cellTypesInModel/cellTypeBModel4cell.pdf", sep = ""), hei
 ggplot(BModelCompare, aes(x = B_cells, y = error)) +
   geom_point(size = 2) +
   theme_cowplot(18) +
-  labs(x = "Proportion of B cells", y = "Error")
+  labs(x = "Proportion of B cells", y = "DSRMSE")
 dev.off()
 
 
@@ -520,7 +520,7 @@ NEDat = cbind.data.frame(error = stackedWithNoise[[1]]$data$error, noise = seq(0
 ggplot(NEDat, aes(x = noise, y = error)) +
   geom_point(size = 2) +
   theme_cowplot(18) +
-  labs(x = "Proportion of noise", y = "Error")
+  labs(x = "Proportion of noise", y = "DSRMSE")
 
 
 ### Compare whole blood, simulated and buccal predictions of blood cell types ###### 
@@ -589,7 +589,7 @@ ggplot(plotDat, aes(x = cellType, y = error, fill = cellType)) +
   geom_violin() +
   theme_cowplot(18) +
   theme(legend.position = "none") +
-  labs(x = element_blank(), y = "Error")
+  labs(x = element_blank(), y = "DSRMSE")
 
 ### Check error with increased missingness of test data ####
 source(paste(path, "RScripts/FunctionsForBrainCellProportionPrediction.r", sep = ""))
@@ -618,7 +618,7 @@ ggplot(plotDat, aes(x = as.factor(nCGmissing), y = error)) +
   geom_boxplot() +
   theme_cowplot(18) +
   scale_x_discrete(labels = propMissing) +
-  labs(x = "Proportion of CpGs missing", y = "Error")
+  labs(x = "Proportion of CpGs missing", y = "DSRMSE")
   
 
 
