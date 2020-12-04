@@ -133,6 +133,19 @@ CellTypeProportionSimulator = function(betas, pheno, phenoColName, nBulk,
       proportionsMatrix = cbind(t(sapply(100 - proportionNoise*100, randomNSumToProp, nCellTypes)), proportionNoise)
       colnames(proportionsMatrix) = c(cellTypes, "Noise")
     }
+  }else{
+    if (noiseIn == T){
+      cellWeight = c()
+      for (i in 1:nCellTypes){
+        cellWeight = c(cellWeight, proportionsMatrix[i]/sum(proportionsMatrix))
+      }
+      proportionsMatrix = matrix(ncol = nCellTypes+1, nrow = nBulk)
+      colnames(proportionsMatrix) = c(cellTypes, "Noise")
+      proportionsMatrix[,nCellTypes+1] = proportionNoise
+      for (i in 1:nBulk){
+        proportionsMatrix[i,1:nCellTypes] = (1 - proportionNoise[i]) * cellWeight
+      }
+    }
   }
   
   ## randomly pick one from each and sum with proportionsMatrix 
@@ -149,7 +162,7 @@ CellTypeProportionSimulator = function(betas, pheno, phenoColName, nBulk,
       simBulk = rowSums(simBulk)
       return(simBulk)
     }else{
-      simBulk = matrix(ncol = nCellTypesCB+1, nrow = nrow(cellSamplesAloneCB[[i]]))
+      simBulk = matrix(ncol = nCellTypesCB+1, nrow = nrow(cellSamplesAloneCB[[1]]))
       for (i in 1:nCellTypesCB){
         simBulk[,i] = cellSamplesAloneCB[[i]][,sample(ncol(cellSamplesAloneCB[[i]]), 1)] * proportionsMatrixCB[proportionRow,i]
       }
@@ -546,6 +559,7 @@ TrueVSPredictedMaintainCellsPlot = function(pred, true, cells = c(T,T,T,T,T), yl
 
 
 ### ErrorAcrossDataSets ###############################
+## ncellType hardcoded here! 
 
 ##  INPUT: list of data sets with nCG from model
 ##         model to be applied
@@ -558,7 +572,7 @@ TrueVSPredictedMaintainCellsPlot = function(pred, true, cells = c(T,T,T,T,T), yl
 
 ErrorAcrossDataSets = function(dataList, model){
   
-  outDat = matrix(ncol = 7, nrow = 0)
+  outDat = matrix(ncol = 8, nrow = 0)
   for (i in 1:length(dataList)){
     outDat = rbind(outDat, projectCellTypeWithError(YIN = dataList[[i]], 
                                                     modelType = "ownModel",

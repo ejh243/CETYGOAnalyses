@@ -272,7 +272,7 @@ ggplot(plotDat, aes(x = norm, y = diff)) +
 dev.off()
 
 
-### create models using 3:6 cell types
+### create models using 3:6 cell types ################
 source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
 source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
@@ -347,7 +347,7 @@ plotDatBox = spread(plotDat, key = c(cellType), value = c(proportion_pred))
 
 ## no stats comparison for any with simulated data as n is decided by me
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/nCelltypeModels/violinnCelltypeModels.pdf", height = 6, width = 6)
+pdf("/mnt/data1/Thea/ErrorMetric/plots/badModels/violinnCelltypeModels.pdf", height = 6, width = 6)
 ggplot(plotDatBox, aes(x = as.factor(sums), y = error, fill = as.factor(sums))) +
   geom_violin() +
   theme_cowplot(18) +
@@ -402,7 +402,7 @@ for(i in 1:6){
                     models5Compared[[i]][[2]] + theme(legend.position = "none"),
                     models5Compared[[i]][[3]] + theme(legend.position = "none"), ncol = 1,
                     rel_heights = c(0.6,1,1), labels = "AUTO", axis = "rl", align = "v" )
-  pdf(paste("/mnt/data1/Thea/ErrorMetric/plots/nCelltypeModels/stackedBar5cell",cellTypes[i],"missing.pdf", sep = ""), height = 9, width = 7)     
+  pdf(paste("/mnt/data1/Thea/ErrorMetric/plots/badModels/stackedBar5cell",cellTypes[i],"missing.pdf", sep = ""), height = 9, width = 7)     
   print(plot_grid(plots, leg, ncol = 1, rel_heights = c(1,0.08)))
   dev.off()
 }
@@ -414,7 +414,7 @@ for (i in 2:6){
   erPlotDat = rbind.data.frame(erPlotDat, models5Compared[[i]][[1]]$data)
 }
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/nCelltypeModels/errorOnly5Celltypes.pdf", height = 4, width = 7)
+pdf("/mnt/data1/Thea/ErrorMetric/plots/badModels/errorOnly5Celltypes.pdf", height = 4, width = 7)
 ggplot(erPlotDat, aes(x = sample, y = error, col = model)) +
   geom_point() +
   theme_cowplot(18) +
@@ -428,25 +428,101 @@ dev.off()
 
 
 
-## check effect of age, sex in EXTEND and US #########
-## load model
-load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
-model = sepNormalisedModel
+### Compare error when noise is introduced ############
 
 ## load functions
 source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
 source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 
-## load data
-load("/mnt/data1/EPICQC/UnderstandingSociety/US_Betas_Pheno.rda")
-us = dat
-load("/mnt/data1/EXTEND/Methylation/QC/EXTEND_batch1_2_merged/EXTEND_batches_1_2_normalised_together.rdat")
-ex = betas
+## load model
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
 
-rm(dat, betas, pheno, sepNormalisedModel)
+## load testing data
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
 
-## get error for US
-usPred = projectCellTypeWithError(us, modelType = "ownModel", ownModelData = model)
+## mean proportions of each cell type in whole blood (from Reinius2012)
+meanBloodProp = matrix(nrow = 1, byrow = T, data = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43))
+colnames(meanBloodProp) = levels(phenoTest$celltype)
 
-## get error for EX
-exPred = projectCellTypeWithError(ex, modelType = "ownModel", ownModelData = model)
+noise = seq(0,0.95,0.05)
+
+## create simulated samples with increasing noise
+testData = CellTypeProportionSimulator(betas = quantileBetasTest, 
+                                       pheno = phenoTest, 
+                                       phenoColName = "celltype", 
+                                       nBulk = length(noise), 
+                                       proportionsMatrixType = "own",
+                                       proportionsMatrix = meanBloodProp,
+                                       noiseIn = T,
+                                       proportionNoise = noise)
+
+
+stackedWithNoise = ModelCompareStackedBar(testBetas = testData[[1]], 
+                                          modelList = list(Predicted = HousemanBlood150CpGModel), 
+                                          trueComparison = T,
+                                          noise = T,
+                                          trueProportions = testData[[2]],
+                                          nCpGPlot = F,
+                                          sampleNamesOnPlots = F)
+
+leg = get_legend(stackedWithNoise[[3]]
+                 + theme(legend.position=c(0.03,0.8),legend.direction = "horizontal", legend.title = element_blank())
+                 + guides(fill = guide_legend(nrow = 1)))
+plots = plot_grid(stackedWithNoise[[1]] + theme(legend.position = "none"),
+                  stackedWithNoise[[2]] + theme(legend.position = "none"),
+                  stackedWithNoise[[3]] + theme(legend.position = "none"), ncol = 1,
+                  rel_heights = c(0.6,1,1), labels = "AUTO", axis = "rl", align = "v" )
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithNoise.pdf", height = 9, width = 7.5)     
+print(plot_grid(plots, leg, ncol = 1, rel_heights = c(1,0.08)))
+dev.off()
+
+
+
+### Check increasing missingness of CpGs ##############
+## load functions
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+## load model
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+
+## load testing data
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
+
+## mean proportions of each cell type in whole blood (from Reinius2012)
+meanBloodProp = matrix(nrow = 1, byrow = T, data = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43))/100
+colnames(meanBloodProp) = levels(phenoTest$celltype)
+
+## create a single representative sample
+testData = CellTypeProportionSimulator(betas = GetModelCG(quantileBetasTest, list(HousemanBlood150CpGModel)), 
+                                       pheno = phenoTest, 
+                                       phenoColName = "celltype", 
+                                       nBulk = 1, 
+                                       proportionsMatrixType = "own",
+                                       proportionsMatrix = meanBloodProp,
+                                       noiseIn = F)
+
+
+## create function to add x NAs to betas
+MakeNAsInBetas = function(proportionNA, betas){
+  nToBeNA = floor(nrow(betas)*proportionNA)
+  NAIndex = sample(nrow(betas), nToBeNA)
+  betas[NAIndex,] = NA
+  return(betas)
+}
+
+propMissing = seq(0,0.9,0.05)
+x = lapply(propMissing, MakeNAsInBetas, testData[[1]])
+
+plotDat = ErrorAcrossDataSets(x, HousemanBlood150CpGModel)
+plotDat = cbind.data.frame(plotDat, propMissing = seq(0,0.9,0.05))
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithMissingCpGs.pdf", height = 4, width = 7) 
+ggplot(plotDat, aes(x = propMissing, y = error)) +
+  geom_point() +
+  theme_cowplot(18) +
+  labs(x = "Proportion of CpGs missing", y = "DSRMSE")
+dev.off()
