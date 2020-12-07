@@ -526,3 +526,61 @@ ggplot(plotDat, aes(x = propMissing, y = error)) +
   theme_cowplot(18) +
   labs(x = "Proportion of CpGs missing", y = "DSRMSE")
 dev.off()
+
+
+
+### check effect of age, sex in EXTEND and US #########
+## load model
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+model =  HousemanBlood150CpGModel
+
+## load functions
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+## load libraries
+library(ggplot2)
+library(cowplot)
+
+## load data
+load("/mnt/data1/EPICQC/UnderstandingSociety/US_Betas_Pheno.rda")
+us = dat
+usPheno = pheno
+load("/mnt/data1/EXTEND/Methylation/QC/EXTEND_batch1_2_merged/EXTEND_batches_1_2_normalised_together.rdat")
+ex = betas
+exPheno = pheno
+rm(dat, betas, pheno, HousemanBlood150CpGModel)
+
+## get error for US
+usPred = projectCellTypeWithError(us, modelType = "ownModel", ownModelData = model)
+
+## get error for EX
+exPred = projectCellTypeWithError(ex, modelType = "ownModel", ownModelData = model)
+
+sexUS = usPheno$nsex
+sexUS = ifelse(sexUS =="1", "Male", "Female")
+allPheno = rbind.data.frame(cbind.data.frame(usPred, data = "US", age = usPheno$confage, sex = sexUS),
+                            cbind.data.frame(exPred, data = "EX", age = exPheno$Age, sex = exPheno$Sex))
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/sexAcrossEXandUS.pdf", height = 7, width = 7) 
+ggplot(allPheno, aes(x = data, y = error, fill = sex)) +
+  geom_violin() +
+  theme_cowplot(18) +
+  labs(y = "DSRMSE", x = "Data set", fill = "Sex")
+dev.off()
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/ageAcrossEXandUS.pdf", height = 7, width = 7) 
+ggplot(allPheno, aes(x = as.numeric(age), y = error, col = data)) +
+  geom_point() +
+  theme_cowplot(18) +
+  labs(y = "DSRMSE", x = "Age", col = "Data")
+dev.off()
+
+t.test(allPheno[allPheno$sex == "Female","error"], allPheno[allPheno$sex == "Male","error"], alternative = "less")
+
+summary(lm(error ~ as.numeric(age), data = allPheno))
+
+## n missing
+exPred[1,8]
+usPred[1,8]
