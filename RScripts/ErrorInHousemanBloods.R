@@ -13,34 +13,40 @@ platform<-"450k"
 referencePkg <- sprintf("FlowSorted.%s.%s", compositeCellType, platform)
 data(list = referencePkg)
 referenceRGset <- get(referencePkg)
-pheno = pData(referenceRGset)$CellType
+phenoDat = pData(referenceRGset)$CellType
 
 ## only keep the 6 wanted cell types
-index = which(pheno == "Bcell" | 
-                pheno == "CD4T" | 
-                pheno == "CD8T" | 
-                pheno == "Gran" | 
-                pheno == "Mono" | 
-                pheno == "NK")
-pheno = as.factor(pheno[index]) 
+index = which(phenoDat == "Bcell" | 
+                phenoDat == "CD4T" | 
+                phenoDat == "CD8T" | 
+                phenoDat == "Gran" | 
+                phenoDat == "Mono" | 
+                phenoDat == "NK")
+phenoDat = as.factor(phenoDat[index]) 
 betas = referenceRGset[,index]
 
 ## subset betas for those in EPIC only
-
-
-# betas = getBeta(betas)
-
 x = read.csv("/mnt/data1/EPIC_reference/MethylationEPIC_v-1-0_B4.csv", skip = 7, header = T)
 EPIC450kLoci = getAnnotation(betas)
 y = subsetByLoci(betas, includeLoci = rownames(EPIC450kLoci)[rownames(EPIC450kLoci) %in% x$IlmnID])
+
+
+## subset for those in EXTEND and Understanding Society
+load("/mnt/data1/EPICQC/UnderstandingSociety/US_Betas_Pheno.rda")
+us = dat
+load("/mnt/data1/EXTEND/Methylation/QC/EXTEND_batch1_2_merged/EXTEND_batches_1_2_normalised_together.rdat")
+ex = betas
+rm(pheno)
+
+USEXrows = rownames(us)[rownames(us) %in% rownames(ex)]
+EPIC450kLoci = getAnnotation(y)
+y = subsetByLoci(y, includeLoci = rownames(EPIC450kLoci)[rownames(EPIC450kLoci) %in% USEXrows])
 betas = y
 
-
-
 ## split into training and testing and add to phenotype cols
-phenoTrain = c(rep("Test", length(pheno)))
-for(i in 1:length(levels(pheno))){
-  cellTypeIndex = which(pheno == levels(pheno)[i])
+phenoTrain = c(rep("Test", length(phenoDat)))
+for(i in 1:length(levels(phenoDat))){
+  cellTypeIndex = which(phenoDat == levels(phenoDat)[i])
   set.seed(123)
   phenoTrain[sample(cellTypeIndex, ceiling(length(cellTypeIndex)/2))] = "Train"
 }
@@ -49,7 +55,10 @@ for(i in 1:length(levels(pheno))){
 ## save as RGset
 betasTrain = betas[,phenoTrain == "Train"]
 betasTest = betas[,phenoTrain == "Test"]
-pheno = data.frame(celltype = pheno, trainTest = phenoTrain)
+pheno = data.frame(celltype = phenoDat, trainTest = phenoTrain)
+
+phenoTrain = pheno[pheno$trainTest == "Train",]
+phenoTest = pheno[pheno$trainTest == "Test",]
 
 save(betas, betasTrain, betasTest, pheno, file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestRGSet.Rdata")
 
@@ -57,10 +66,12 @@ save(betas, betasTrain, betasTest, pheno, file = "/mnt/data1/Thea/ErrorMetric/da
 betas = getBeta(preprocessRaw(betas))
 betasTrain = getBeta(preprocessRaw(betasTrain))
 betasTest = getBeta(preprocessRaw(betasTest))
-save(betas, betasTrain, betasTest, pheno, file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+save(betas, betasTrain, betasTest, pheno, phenoTrain, phenoTest,
+     file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
 
 
 ## quantile normalise together and apart
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestRGSet.Rdata")
 quantileBetasTrain = getBeta(preprocessQuantile(betasTrain, fixOutliers = TRUE,
                                                 removeBadSamples = TRUE, badSampleCutoff = 10.5,
                                                 quantileNormalize = TRUE, stratified = TRUE, 
@@ -75,15 +86,14 @@ quantileBetas = getBeta(preprocessQuantile(betas, fixOutliers = TRUE,
                                            mergeManifest = FALSE, sex = NULL))
 
 
-phenoTrain = pheno[pheno$trainTest == "Train",]
-phenoTest = pheno[pheno$trainTest == "Test",]
+
 
 ## save data
 save(quantileBetasTrain, quantileBetasTest, quantileBetas, phenoTest, phenoTrain, pheno,
      file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
 
 ## plot PCA of betas per cell type coloured by train test
-load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
 library(ggfortify)
 library(ggplot2)
 library(cowplot)
@@ -93,7 +103,7 @@ plotDat = list()
 colours = hue_pal()(6)
 shapes = c(16, 17, 15, 3, 7, 8)
 for (i in 1:length(levels(pheno$celltype))){
-  dat = quantileBetas[, pheno$celltype == levels(pheno$celltype)[i]]
+  dat = betas[, pheno$celltype == levels(pheno$celltype)[i]]
   datPheno = pheno[pheno$celltype == levels(pheno$celltype)[i],]
   betaVar = apply(dat, 1, var, na.rm = T)
   topBeta = dat[order(betaVar, decreasing = T)[1:1000],]
@@ -116,19 +126,90 @@ plot_grid(plotDat[[1]],
 dev.off()
 
 ## full PCA to show celltype similarity
-betaVar = apply(quantileBetas, 1, var, na.rm = T)
-topBeta = quantileBetas[order(betaVar, decreasing = T)[1:1000],]
+betaVar = apply(betas, 1, var, na.rm = T)
+topBeta = betas[order(betaVar, decreasing = T)[1:1000],]
 plotDatPCAFULL = autoplot(prcomp(t(topBeta)), data = pheno, col = "celltype", shape = "celltype", size = 2) +
   theme_cowplot(18)
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellTrainTestPCA.pdf",height = 7, width = 7)
+pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellPCA.pdf",height = 7, width = 7)
 plotDatPCAFULL +
   labs(col = "Cell type", shape = "Cell type")
 dev.off()
 
-### Optimise number of CpGs ###########################
+
+### check effect of normalisation #####################
 ## load normalised data 
 load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+
+## source model functions
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+## create model in separately normalised train data
+unnormalisedModel = pickCompProbes(rawbetas = betasTrain,
+                                   cellTypes = levels(as.factor(phenoTrain$celltype)),
+                                   cellInd = as.factor(phenoTrain$celltype),
+                                   numProbes =  150,
+                                   probeSelect = "auto")
+
+## create model in separately normalised train data
+sepNormalisedModel = pickCompProbes(rawbetas = quantileBetasTrain,
+                                    cellTypes = levels(as.factor(phenoTrain$celltype)),
+                                    cellInd = as.factor(phenoTrain$celltype),
+                                    numProbes =  150,
+                                    probeSelect = "auto")
+
+## create model in combined normalised train data
+combNormalisedModel = pickCompProbes(rawbetas = quantileBetas[, pheno$trainTest == "Train"],
+                                     cellTypes = levels(as.factor(phenoTrain$celltype)),
+                                     cellInd = as.factor(phenoTrain$celltype),
+                                     numProbes =  150,
+                                     probeSelect = "auto")
+
+## apply both models to their respective test data sets
+unnormalisedPrediction = projectCellTypeWithError(betasTest, model = "ownModel", ownModelData = unnormalisedModel)
+sepNormalisedPrediction = projectCellTypeWithError(quantileBetasTest, model = "ownModel", ownModelData = sepNormalisedModel)
+combNormalisedPrediction = projectCellTypeWithError(quantileBetas[, pheno$trainTest == "Test"], model = "ownModel", ownModelData = combNormalisedModel)
+trueProp = singleCellProportionMatrix(phenoTest[,1])
+
+library(ggplot2)
+library(cowplot)
+library(reshape2)
+
+# get absolute difference in predictions
+unnormMelt = melt(unnormalisedPrediction[,-which(colnames(unnormalisedPrediction) %in% c("nCGmissing", "error"))])
+sepMelt = melt(sepNormalisedPrediction[,-which(colnames(sepNormalisedPrediction) %in% c("nCGmissing", "error"))])
+combMelt = melt(combNormalisedPrediction[,-which(colnames(combNormalisedPrediction) %in% c("nCGmissing", "error"))])
+absDiffUn = abs(unnormMelt[,3] - melt(trueProp)[,3])
+absDiffSep = abs(sepMelt[,3] - melt(trueProp)[,3])
+absDiffComb = abs(combMelt[,3] - melt(trueProp)[,3])
+
+
+plotDat = data.frame(diff = c(absDiffUn, absDiffComb, absDiffSep), 
+                     norm = rep(c("Unnormalised", "Seperate", "Combined"), each = length(absDiffComb)),
+                     cell = as.factor(c(as.character(unnormMelt[,2]), as.character(sepMelt[,2]), as.character(combMelt[,2]))))
+
+## use a paired one-sided t-test to compare the groups
+t.test(absDiffComb, absDiffSep, paired = T)
+t.test(absDiffUn, absDiffSep, paired = T)
+t.test(absDiffUn, absDiffComb, paired = T)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/sepCombNormalisationComparison.pdf", height = 7, width = 9)
+ggplot(plotDat, aes(x = norm, y = diff)) +
+  geom_violin() +
+  geom_jitter(aes(col = cell, shape = cell)) +
+  theme_cowplot(18) +
+  labs(x = "Normalisation", y = "Absolute difference between\ntrue and predicted") +
+  theme(legend.title = element_blank())
+dev.off()
+
+
+
+### Optimise number of CpGs ###########################
+## load normalised data 
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
 
 ## source model functions
 source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
@@ -139,7 +220,7 @@ source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 # modelListCpG = list()
 # cpg = c(1:25,seq(30,55,5), seq(60, 200, 10))
 # for (i in 1:length(cpg)) {
-#   modelListCpG[[i]] = pickCompProbes(rawbetas = as.matrix(quantileBetasTrain),
+#   modelListCpG[[i]] = pickCompProbes(rawbetas = as.matrix(betasTrain),
 #                                      cellTypes = levels(as.factor(phenoTrain$celltype)),
 #                                      cellInd = as.factor(phenoTrain$celltype),
 #                                      numProbes =  cpg[i],
@@ -163,7 +244,7 @@ RMSE = function(m, o){
 }
 
 for (i in 1:length(cpg)) {
-  pred = projectCellTypeWithError(quantileBetasTest,  modelType = "ownModel", ownModelData = modelListCpG[[i]])
+  pred = projectCellTypeWithError(betasTest,  modelType = "ownModel", ownModelData = modelListCpG[[i]])
   rmseTvP = c(rmseTvP, RMSE(melt(trueProp)[,3], melt(pred[,-which(colnames(pred) %in% c("nCGmissing", "error"))])[,3]))
 }
 
@@ -188,12 +269,12 @@ save(HousemanBlood150CpGModel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models
 load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
 
 ## load data
-load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
 
 ## load functions
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 
-modelBetas = GetModelCG(quantileBetasTrain, list(HousemanBlood150CpGModel))
+modelBetas = GetModelCG(betasTrain, list(HousemanBlood150CpGModel))
 library(gplots)
 library(viridis)
 library(scales)
@@ -213,63 +294,6 @@ Heatmap(modelBetas, name = "DNAm",
         top_annotation = ha, show_row_names = F, show_column_names = F, show_row_dend = F)
 dev.off()
 
-### check effect of normalisation #####################
-## load normalised data 
-load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
-load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
-
-## source model functions
-source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
-source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
-
-## create model in separately normalised train data
-sepNormalisedModel = pickCompProbes(rawbetas = quantileBetasTrain,
-                                    cellTypes = levels(as.factor(phenoTrain$celltype)),
-                                    cellInd = as.factor(phenoTrain$celltype),
-                                    numProbes =  150,
-                                    probeSelect = "auto")
-
-## create model in combined normalised train data
-combNormalisedModel = pickCompProbes(rawbetas = quantileBetas[, pheno$trainTest == "Train"],
-                                     cellTypes = levels(as.factor(phenoTrain$celltype)),
-                                     cellInd = as.factor(phenoTrain$celltype),
-                                     numProbes =  150,
-                                     probeSelect = "auto")
-
-## apply both models to their respective test data sets
-sepNormalisedPrediction = projectCellTypeWithError(quantileBetasTest, model = "ownModel", ownModelData = sepNormalisedModel)
-combNormalisedPrediction = projectCellTypeWithError(quantileBetas[, pheno$trainTest == "Test"], model = "ownModel", ownModelData = combNormalisedModel)
-trueProp = singleCellProportionMatrix(phenoTest[,1])
-
-library(ggplot2)
-library(cowplot)
-library(reshape2)
-
-# get absolute difference in predictions
-sepMelt = melt(sepNormalisedPrediction[,-which(colnames(sepNormalisedPrediction) %in% c("nCGmissing", "error"))])
-combMelt = melt(combNormalisedPrediction[,-which(colnames(combNormalisedPrediction) %in% c("nCGmissing", "error"))])
-absDiffSep = abs(sepMelt[,3] - melt(trueProp)[,3])
-absDiffComb = abs(combMelt[,3] - melt(trueProp)[,3])
-
-
-plotDat = data.frame(diff = c(absDiffComb, absDiffSep), 
-                     norm = rep(c("Seperate", "Combined"), each = length(absDiffComb)),
-                     cell = as.factor(c(as.character(sepMelt[,2]), as.character(combMelt[,2]))))
-
-## use a paired one-sided t-test to compare the groups
-ttest = t.test(absDiffComb, absDiffSep, paired = T, alternative = "less")
-
-pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/sepCombNormalisationComparison.pdf")
-ggplot(plotDat, aes(x = norm, y = diff)) +
-  geom_violin() +
-  geom_jitter(aes(col = cell, shape = cell)) +
-  theme_cowplot(18) +
-  labs(x = "Normalization", y = "Absolute difference between\ntrue and predicted") +
-  theme(legend.title = element_blank()) +
-  ylim(c(-0.001,0.3)) +
-  annotate("text", x = 1.5, y = 0.3, label = paste("p =", signif(ttest$p.value, 3)), size = 5)
-dev.off()
 
 
 ### create models using 3:6 cell types ################
@@ -278,7 +302,7 @@ source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 
 ## load data
-load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
 
 ## make design matrix of booleans for which cell type will be present
 designMatrix = expand.grid(c(T,F), c(T,F), c(T,F), c(T,F), c(T,F), c(T,F))
@@ -290,7 +314,7 @@ cellTypeShorthand = c("B", "C4", "C8", "G", "M", "NK")
 # modelList = list()
 # for (i in 1:nrow(designMatrix)){
 #   modellingDat = CellTypeSubsetBetasAndPheno(cellTypes[unlist(designMatrix[i,])],
-#                                              quantileBetasTrain, phenoTrain, phenoColName = "celltype", justBetas = F)
+#                                              betasTrain, phenoTrain, phenoColName = "celltype", justBetas = F)
 #   modelList[[i]] = pickCompProbes(rawbetas = as.matrix(modellingDat[[1]]),
 #                                   cellTypes = levels(as.factor(as.character(modellingDat[[2]]$celltype))),
 #                                   cellInd = as.factor(as.character(modellingDat[[2]]$celltype)),
@@ -300,7 +324,7 @@ cellTypeShorthand = c("B", "C4", "C8", "G", "M", "NK")
 # }
 # 
 # save(modelList, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
-#
+# 
 # load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
 # 
 # ## mean proportions of each cell type in whole blood (from Reinius2012)
@@ -309,7 +333,7 @@ cellTypeShorthand = c("B", "C4", "C8", "G", "M", "NK")
 # 
 # # each cell type will be simulated with mean, mean +- sd, mean +- 2sd
 # 
-# bulk = CellTypeProportionSimulator(GetModelCG(quantileBetasTest, modelList),
+# bulk = CellTypeProportionSimulator(GetModelCG(betasTest, modelList),
 #                             phenoTest,
 #                             phenoColName = "celltype",
 #                             nBulk = 30,
@@ -357,8 +381,6 @@ ggplot(plotDatBox, aes(x = as.factor(sums), y = error, fill = as.factor(sums))) 
 dev.off() 
 
 
-
-
 ## general Q: 
 ## why do some still predict well? low proportion of that cell type? cell type less important?
 
@@ -377,7 +399,7 @@ models5Compared = list()
 for (i in 1:6){
   celltypePreBool = 1:6
   bulkProp = simPropMaker2(meanBloodProp, celltypeBool = celltypePreBool == i, cellNames = cellTypes)
-  bulk = CellTypeProportionSimulator(GetModelCG(quantileBetasTest, list(models5[[i]])),
+  bulk = CellTypeProportionSimulator(GetModelCG(betasTest, list(models5[[i]])),
                                      phenoTest,
                                      phenoColName = "celltype",
                                      nBulk = nrow(bulkProp),
@@ -439,7 +461,7 @@ source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
 
 ## load testing data
-load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
 
 ## mean proportions of each cell type in whole blood (from Reinius2012)
 meanBloodProp = matrix(nrow = 1, byrow = T, data = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43))
@@ -448,7 +470,7 @@ colnames(meanBloodProp) = levels(phenoTest$celltype)
 noise = seq(0,0.95,0.05)
 
 ## create simulated samples with increasing noise
-testData = CellTypeProportionSimulator(betas = quantileBetasTest, 
+testData = CellTypeProportionSimulator(betas = betasTest, 
                                        pheno = phenoTest, 
                                        phenoColName = "celltype", 
                                        nBulk = length(noise), 
@@ -490,14 +512,14 @@ source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
 
 ## load testing data
-load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
 
 ## mean proportions of each cell type in whole blood (from Reinius2012)
 meanBloodProp = matrix(nrow = 1, byrow = T, data = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43))/100
 colnames(meanBloodProp) = levels(phenoTest$celltype)
 
 ## create a single representative sample
-testData = CellTypeProportionSimulator(betas = GetModelCG(quantileBetasTest, list(HousemanBlood150CpGModel)), 
+testData = CellTypeProportionSimulator(betas = GetModelCG(betasTest, list(HousemanBlood150CpGModel)), 
                                        pheno = phenoTest, 
                                        phenoColName = "celltype", 
                                        nBulk = 1, 
@@ -577,10 +599,9 @@ ggplot(allPheno, aes(x = as.numeric(age), y = error, col = data)) +
   labs(y = "DSRMSE", x = "Age", col = "Data")
 dev.off()
 
-t.test(allPheno[allPheno$sex == "Female","error"], allPheno[allPheno$sex == "Male","error"], alternative = "less")
+t.test(allPheno[allPheno$sex == "Female","error"], allPheno[allPheno$sex == "Male","error"], alternative = "greater")
 
 summary(lm(error ~ as.numeric(age), data = allPheno))
 
-## n missing
-exPred[1,8]
-usPred[1,8]
+
+
