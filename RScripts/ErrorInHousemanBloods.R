@@ -168,10 +168,12 @@ combNormalisedModel = pickCompProbes(rawbetas = quantileBetas[, pheno$trainTest 
                                      numProbes =  150,
                                      probeSelect = "auto")
 
-## apply both models to their respective test data sets
+## apply models to their respective test data sets
 unnormalisedPrediction = projectCellTypeWithError(betasTest, model = "ownModel", ownModelData = unnormalisedModel)
 sepNormalisedPrediction = projectCellTypeWithError(quantileBetasTest, model = "ownModel", ownModelData = sepNormalisedModel)
 combNormalisedPrediction = projectCellTypeWithError(quantileBetas[, pheno$trainTest == "Test"], model = "ownModel", ownModelData = combNormalisedModel)
+unModNormDatPrediction = projectCellTypeWithError(quantileBetasTest, model = "ownModel", ownModelData = unnormalisedModel)
+normModUnDatPrediction = projectCellTypeWithError(betasTest, model = "ownModel", ownModelData = sepNormalisedModel)
 trueProp = singleCellProportionMatrix(phenoTest[,1])
 
 library(ggplot2)
@@ -182,21 +184,28 @@ library(reshape2)
 unnormMelt = melt(unnormalisedPrediction[,-which(colnames(unnormalisedPrediction) %in% c("nCGmissing", "error"))])
 sepMelt = melt(sepNormalisedPrediction[,-which(colnames(sepNormalisedPrediction) %in% c("nCGmissing", "error"))])
 combMelt = melt(combNormalisedPrediction[,-which(colnames(combNormalisedPrediction) %in% c("nCGmissing", "error"))])
+unModNormDatMelt = melt(unModNormDatPrediction[,-which(colnames(unModNormDatPrediction) %in% c("nCGmissing", "error"))])
+normModUnDatMelt = melt(normModUnDatPrediction[,-which(colnames(normModUnDatPrediction) %in% c("nCGmissing", "error"))])
+
 absDiffUn = abs(unnormMelt[,3] - melt(trueProp)[,3])
 absDiffSep = abs(sepMelt[,3] - melt(trueProp)[,3])
 absDiffComb = abs(combMelt[,3] - melt(trueProp)[,3])
+absDiffunModNormDat = abs(unModNormDatMelt[,3] - melt(trueProp)[,3])
+absDiffnormModUnDat = abs(normModUnDatMelt[,3] - melt(trueProp)[,3])
 
 
-plotDat = data.frame(diff = c(absDiffUn, absDiffComb, absDiffSep), 
-                     norm = rep(c("Unnormalised", "Seperate", "Combined"), each = length(absDiffComb)),
-                     cell = as.factor(c(as.character(unnormMelt[,2]), as.character(sepMelt[,2]), as.character(combMelt[,2]))))
+plotDat = data.frame(diff = c(absDiffUn, absDiffComb, absDiffSep, absDiffunModNormDat, absDiffnormModUnDat), 
+                     norm = rep(c("Unnormalised", "Seperate", "Combined", "Unnormalised Train\nNormalised Test", "Normalised Train\nUnnormalised Test"), each = length(absDiffComb)),
+                     cell = as.factor(c(as.character(unnormMelt[,2]), as.character(sepMelt[,2]), as.character(combMelt[,2]), as.character(sepMelt[,2]), as.character(sepMelt[,2]))))
 
-## use a paired one-sided t-test to compare the groups
-t.test(absDiffComb, absDiffSep, paired = T)
-t.test(absDiffUn, absDiffSep, paired = T)
-t.test(absDiffUn, absDiffComb, paired = T)
+## use a paired t-test to compare each group to comb, the default
+dat = cbind(absDiffUn, absDiffComb, absDiffSep, absDiffunModNormDat, absDiffnormModUnDat)
+library(xtable)
+xtable(rbind.data.frame(t.testMatrix(dat), mean = signif(colMeans(dat),3), 
+                        SD = signif(apply(dat, 2, sd),3)))
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/sepCombNormalisationComparison.pdf", height = 7, width = 9)
+pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/sepCombNormalisationComparison.pdf", 
+    height = 7, width = 11)
 ggplot(plotDat, aes(x = norm, y = diff)) +
   geom_violin() +
   geom_jitter(aes(col = cell, shape = cell)) +

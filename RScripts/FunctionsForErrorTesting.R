@@ -654,3 +654,36 @@ simPropMaker2 = function(meanBloodProp, celltypeBool = c(T,F,F,F,F,F), cellNames
 }
 
 
+
+
+### t.testMatrix ######################################
+
+##  INPUT: matrix of n groups to compare in a paired t test
+
+## OUTPUT: ttest matrix
+
+# # test data 
+# dat = cbind(absDiffUn, absDiffComb, absDiffSep, absDiffunModNormDat, absDiffnormModUnDat)
+# t.testMatrix(dat, alt = T)
+# anything other than two sided will have inconsistent direction 
+
+t.testMatrix = function(dat, pair = T, altVal = "two.sided", LaTex = F){
+  outmat = data.frame(matrix(ncol = ncol(dat), nrow = ncol(dat), data = 1))
+  colnames(outmat) = rownames(outmat) = colnames(dat)
+  for (i in 1:ncol(dat)){
+    for (j in 1:ncol(dat)){
+      if (i>j){
+        val = t.test(dat[,i], dat[,j], paired = pair, alternative = altVal)$p.value
+        outmat[i,j] = as.character(signif(val, 3))
+        if(val > 0.05){outmat[j,i] = "ns"}
+        if(val <= 0.05){outmat[j,i] = "*"}
+        if(val <= 0.01){outmat[j,i] = "**"}
+        if(val <= 0.001){outmat[j,i] = "***"}
+      }
+    }
+  }
+  if(!LaTex){
+    return(outmat)
+  }
+  return(xtable(outmat))
+}
