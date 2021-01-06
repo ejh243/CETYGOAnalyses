@@ -2,7 +2,7 @@
 ## Dorothea Seiler Vellame
 ## started 18-11-2020
 
-### load data and assign training and testing #########
+### Load data and assign training and testing #########
 library(minfi)
 library(wateRmelon)
 library(FlowSorted.Blood.450k)
@@ -137,7 +137,7 @@ plotDatPCAFULL +
 dev.off()
 
 
-### check effect of normalisation #####################
+### Check effect of normalisation #####################
 ## load normalised data 
 load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
 load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
@@ -305,7 +305,7 @@ dev.off()
 
 
 
-### create models using 3:6 cell types ################
+### Create models using 3:6 cell types ################
 source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
 source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
@@ -560,7 +560,7 @@ dev.off()
 
 
 
-### check effect of age, sex in EXTEND and US #########
+### Check effect of age, sex in EXTEND and US #########
 ## load model
 load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
 model =  HousemanBlood150CpGModel
@@ -614,3 +614,104 @@ summary(lm(error ~ as.numeric(age), data = allPheno))
 
 
 
+
+
+### Plot outputs from Essex data
+## open gds and make into matrix
+library(gdsfmt)
+gfile = openfn.gds("/mnt/data1/Thea/ErrorMetric/data/EssexOutput/sub.gds")
+
+dat = cbind.data.frame(read.gdsn(index.gdsn(gfile$root, "Pred")),
+                       Age = read.gdsn(index.gdsn(gfile$root, "Age")),
+                       Sex = read.gdsn(index.gdsn(gfile$root, "Sex")),
+                       Tissue = read.gdsn(index.gdsn(gfile$root, "Tissue")),
+                       SubTissue = read.gdsn(index.gdsn(gfile$root, "SubTissue")),
+                       DatasetOrigin = read.gdsn(index.gdsn(gfile$root, "DatasetOrigin")))
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+colnames(dat)[1:8] = c(colnames(HousemanBlood150CpGModel$coefEsts), "error", "nCGmissing")
+
+## remove the .gds from DatasetOrigin
+dat$DatasetOrigin = as.factor(unlist(strsplit(as.character(dat$DatasetOrigin), ".g"))[seq(1,nrow(dat)*2,2)])
+
+## remove samples withmissing CpGs
+dat = dat[dat$nCGmissing ==0,]
+
+## create a Blood Bool to colour by
+dat$blood = rep(0, nrow(dat))
+dat$blood[dat$Tissue == "Blood" |
+            dat$Tissue == "B Cells" |
+            dat$Tissue == "Granulocyes" |
+            dat$Tissue == "Neutrophils" |
+            dat$Tissue == "NK" |
+            dat$Tissue == "Lymph Node" |
+            dat$Tissue == "T Cells"] = 1
+
+## plot
+library(ggplot2)
+library(cowplot)
+library(forcats)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexsAllTissueBoxplot.pdf", height = 9, width = 13)
+ggplot(dat, aes(x = fct_reorder(Tissue, blood, .fun = median, .desc =TRUE), y = error, fill = as.factor(blood))) +
+  geom_boxplot() +
+  theme_cowplot(18) +
+  scale_fill_manual(values = c("#0A8ABA", "#BA3A0A"), name = "Blood?", labels = c("No", "Yes")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  labs(x = element_blank(), y = "DSRMSE")
+dev.off()
+
+## t test between blood and non blood samples
+t.test(dat$error[dat$blood ==0], dat$error[dat$blood ==1])
+
+# ## plot the same for only blood
+# datB = dat[dat$blood == 1,]
+# ggplot(datB, aes(x = fct_reorder(DatasetOrigin, error, .fun = median, .desc =F), y = error)) +
+#   geom_boxplot() +
+#   theme_cowplot(18) +
+#   theme(legend.position = "none", axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+#   labs(x = "Tissue", y = "DSRMSE") 
+# 
+# 
+# ## check relationship with age
+# ggplot(datB, aes(x = as.numeric(as.character(Age)), y = error, col = Sex)) +
+#   geom_point() +
+#   theme_cowplot(18) +
+#   labs(x = "Age", y = "DSRMSE") 
+
+## select purified blood cell types
+datB = dat[dat$blood == 1,]
+datB = datB[!(datB$Tissue == "Blood" | datB$Tissue == "Lymph Node" | datB$Tissue == "Neutrophils"), ]
+
+datB$trueProp = rep(NA, nrow(datB))
+
+datB$trueProp[datB$Tissue == "B Cells"] = datB$Bcell[datB$Tissue == "B Cells"]
+datB$trueProp[datB$Tissue == "Granulocyes"] = datB$Gran[datB$Tissue == "Granulocyes"]
+datB$trueProp[datB$Tissue == "NK"] = datB$NK[datB$Tissue == "NK"]
+datB$trueProp[datB$Tissue == "T Cells"] = datB$CD4T[datB$Tissue == "T Cells"] + datB$CD8T[datB$Tissue == "T Cells"]
+
+ggplot(datB, aes(x = trueProp, y = error, col = Tissue)) +
+  geom_point() +
+  theme_cowplot(18) +
+  labs(x = "True proportion", y = "DSRMSE")
+  
+ggplot(datB, aes(x = trueProp, y = error, shape = Tissue, col = DatasetOrigin)) +
+  geom_point(size = 2) +
+  theme_cowplot(18) +
+  labs(x = "True proportion", y = "DSRMSE")
+
+##  plot a grid of one cell type at a time
+plot = list()
+for (i in 1:4){
+  plot[[i]] = ggplot(datB[datB$Tissue == levels(as.factor(as.character(datB$Tissue)))[i],],
+                     aes(x = trueProp, y = error, col = DatasetOrigin)) +
+    geom_point(size = 2) +
+    theme_cowplot(18) +
+    labs(x = "True proportion", y = "DSRMSE", coll = "Data") +
+    xlim(c(min(datB$trueProp),max(datB$trueProp))) +
+    ylim(c(0, max(datB$error))) +
+    ggtitle(levels(as.factor(as.character(datB$Tissue)))[i])
+}
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodCellTypevsError.pdf", height = 10, width = 10)
+plot_grid(plot[[1]], plot[[2]], plot[[3]], plot[[4]], labels = "AUTO")
+dev.off()
