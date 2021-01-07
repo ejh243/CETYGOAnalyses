@@ -646,6 +646,9 @@ dat$blood[dat$Tissue == "Blood" |
             dat$Tissue == "Lymph Node" |
             dat$Tissue == "T Cells"] = 1
 
+## close gds 
+closefn.gds(gfile)
+
 ## plot
 library(ggplot2)
 library(cowplot)
@@ -663,20 +666,35 @@ dev.off()
 ## t test between blood and non blood samples
 t.test(dat$error[dat$blood ==0], dat$error[dat$blood ==1])
 
-# ## plot the same for only blood
-# datB = dat[dat$blood == 1,]
-# ggplot(datB, aes(x = fct_reorder(DatasetOrigin, error, .fun = median, .desc =F), y = error)) +
-#   geom_boxplot() +
-#   theme_cowplot(18) +
-#   theme(legend.position = "none", axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-#   labs(x = "Tissue", y = "DSRMSE") 
-# 
-# 
-# ## check relationship with age
-# ggplot(datB, aes(x = as.numeric(as.character(Age)), y = error, col = Sex)) +
-#   geom_point() +
-#   theme_cowplot(18) +
-#   labs(x = "Age", y = "DSRMSE") 
+## plot the same for only blood
+datB = dat[dat$blood == 1,]
+pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodBoxplot.pdf", height = 10, width = 16)
+ggplot(datB, aes(x = fct_reorder(DatasetOrigin, error, .fun = median, .desc =F), y = error, fill = "#BA3A0A")) +
+  geom_boxplot() +
+  theme_cowplot(18) +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.text.x.bottom = element_text(size=12)) +
+  labs(x = "Study", y = "DSRMSE")
+dev.off()
+
+
+## check relationship with age
+## remove those without age or sex
+datBAS = datB[!datB$Sex == "",]
+pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodSexCheck.pdf", height = 10, width = 16)
+ggplot(datBAS, aes(x = fct_reorder(DatasetOrigin, error, .fun = median, .desc =F), y = error, fill = as.factor(as.character(Sex)))) +
+  geom_boxplot() +
+  theme_cowplot(18) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.text.x.bottom = element_text(size=12)) +
+  labs(x = "Study", y = "DSRMSE", fill = "Sex")
+dev.off()
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodAgeCheck.pdf", height = 13, width = 9)
+ggplot(datBAS, aes(x = as.numeric(as.character(Age)), y = error, col = as.factor(as.character(DatasetOrigin)))) +
+  geom_point(size = 1.4) +
+  theme_cowplot(18) +
+  theme(legend.position = "bottom", legend.text = element_text(size=12)) +
+  labs(x = "Age", y = "DSRMSE", col = "Study") 
+dev.off()
 
 ## select purified blood cell types
 datB = dat[dat$blood == 1,]
@@ -689,15 +707,6 @@ datB$trueProp[datB$Tissue == "Granulocyes"] = datB$Gran[datB$Tissue == "Granuloc
 datB$trueProp[datB$Tissue == "NK"] = datB$NK[datB$Tissue == "NK"]
 datB$trueProp[datB$Tissue == "T Cells"] = datB$CD4T[datB$Tissue == "T Cells"] + datB$CD8T[datB$Tissue == "T Cells"]
 
-ggplot(datB, aes(x = trueProp, y = error, col = Tissue)) +
-  geom_point() +
-  theme_cowplot(18) +
-  labs(x = "True proportion", y = "DSRMSE")
-  
-ggplot(datB, aes(x = trueProp, y = error, shape = Tissue, col = DatasetOrigin)) +
-  geom_point(size = 2) +
-  theme_cowplot(18) +
-  labs(x = "True proportion", y = "DSRMSE")
 
 ##  plot a grid of one cell type at a time
 plot = list()
@@ -715,3 +724,10 @@ for (i in 1:4){
 pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodCellTypevsError.pdf", height = 10, width = 10)
 plot_grid(plot[[1]], plot[[2]], plot[[3]], plot[[4]], labels = "AUTO")
 dev.off()
+
+
+## stacked bar charts for each study in each cell type
+## B cells
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+
