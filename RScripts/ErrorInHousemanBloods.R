@@ -626,6 +626,7 @@ dat = cbind.data.frame(read.gdsn(index.gdsn(gfile$root, "Pred")),
                        Sex = read.gdsn(index.gdsn(gfile$root, "Sex")),
                        Tissue = read.gdsn(index.gdsn(gfile$root, "Tissue")),
                        SubTissue = read.gdsn(index.gdsn(gfile$root, "SubTissue")),
+                       Sample = read.gdsn(index.gdsn(gfile$root, "colnames")),
                        DatasetOrigin = read.gdsn(index.gdsn(gfile$root, "DatasetOrigin")))
 load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
 colnames(dat)[1:8] = c(colnames(HousemanBlood150CpGModel$coefEsts), "error", "nCGmissing")
@@ -730,4 +731,44 @@ dev.off()
 ## B cells
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 
+predictions = datB[datB$Tissue == "T Cells",]
 
+temp = cellTypeCompareStackedBar(predictions)
+
+plotList = list()
+datB$Tissue = as.factor(as.character(datB$Tissue))
+for(i in 1:length(levels(datB$Tissue))){
+  plotList = c(plotList, 
+               cellTypeCompareStackedBar(
+                 datB[datB$Tissue == levels(datB$Tissue)[i],]))
+}
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar.pdf")
+for(i in 1:length(plotList)){
+  print(plotList[[i]])
+}
+dev.off()
+
+## plot trueProp against 1-sum(predicted)
+datB$totalPred = rowSums(datB[,c("Bcell", "CD4T", "CD8T","Gran", "Mono","NK")])
+datB$absDiffPred = abs(rowSums(datB[,c("Bcell", "CD4T", "CD8T","Gran", "Mono","NK")])-1)
+
+
+ggplot(datB, aes(x = trueProp, y = absDiffPred, col = DatasetOrigin, shape = Tissue)) +
+  geom_point() +
+  theme_cowplot(18) +
+  labs(x = "True proportion", y = "|Sum of predictions - 1|")
+
+ggplot(datB, aes(x = trueProp, y = absDiffPred, col = error, shape = Tissue)) +
+  geom_point() +
+  theme_cowplot(18) +
+  labs(x = "True proportion", y = "|Sum of predictions - 1|")
+
+
+## doesn't show anything! Now look up the worst datasets in GEO in the hope that they're all cancer or something...
+datBad = datB[datB$error <0.1 & datB$trueProp<0.75,]
+levels(as.factor(as.character(datBad$DatasetOrigin)))
+
+## get sample IDs for samples in GSE89251 with low error, bad pred and those with higher error
+datBad[datBad$DatasetOrigin == "GSE89251" & datBad$trueProp < 0.5,"Sample"]
+datB[datB$DatasetOrigin == "GSE89251" & datB$error > 0.2,"Sample"]

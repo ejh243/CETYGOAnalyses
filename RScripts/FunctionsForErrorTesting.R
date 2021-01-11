@@ -6,6 +6,7 @@ library(tidyr)
 library(ggplot2)
 library(cowplot)
 library(scales)
+library(forcats)
 
 ### CellTypeSubsetBetasAndPheno #######################
 ### subsetting betas and phenotype using cell type information given the cell type names wanted to keep 
@@ -489,6 +490,64 @@ ModelCompareStackedBar = function(testBetas,
   return(plotList)
 }
 
+
+##  INPUT predictions - prediction output includes error
+##        cellTypeName 
+
+## OUTPUT plotList
+cellTypeCompareStackedBar = function(predictions){
+  
+  cellTypeName = as.character(predictions$Tissue[1])
+  
+  predictions$sample = rownames(predictions)
+  predictions = gather(predictions, key = "cellType", value = "proportion_pred", 
+                       -one_of(c("error", "nCGmissing", 
+                                 "Sex", "Age", 
+                                 "Tissue", "SubTissue",
+                                 "sample", "DatasetOrigin",
+                                 "blood", "trueProp")))
+  
+  plotList = list()
+  
+  allCellTypes = levels(as.factor(predictions$cellType))
+  colPerCell = hue_pal()(length(allCellTypes))
+  
+  predictions$DatasetOrigin = as.factor(as.character(predictions$DatasetOrigin))
+  
+  ## plot stacked  bar chart
+  for(i in 1:length(levels(predictions$DatasetOrigin))){
+    plotDat = predictions[predictions$DatasetOrigin == levels(predictions$DatasetOrigin)[i],]
+    
+    colNeeded = which(allCellTypes %in% levels(as.factor(as.character(plotDat$cellType))))
+    
+    
+    plotA = ggplot(plotDat, aes(x = fct_reorder(sample, error, .fun = mean), y = error)) +
+      geom_point() +
+      theme_cowplot(18) +
+      theme(axis.title.x=element_blank(),
+            axis.text.x=element_blank(),
+            axis.ticks.x=element_blank()) +
+      labs(x = "Sample", y = "DSRMSE") +
+      ggtitle(paste(cellTypeName, "-", levels(predictions$DatasetOrigin)[i])) +
+                ylim(c(0, max(predictions$error)))
+              
+              plotB =  ggplot(plotDat, aes(x = fct_reorder(sample, error, .fun = mean), y = proportion_pred, fill = cellType)) +
+                geom_bar(position="stack", stat="identity") +
+                theme_cowplot(18) +
+                theme(axis.title.x=element_blank(),
+                      axis.text.x=element_blank(),
+                      axis.ticks.x=element_blank()) +
+                labs(x = "Sample", y = "Proportion", fill = "Cell type") +
+                scale_fill_manual(values = c(colPerCell[colNeeded]))
+              
+              plotList[[i]] = plot_grid(plotA, plotB, 
+                                        labels = "AUTO", ncol = 1,
+                                        rel_heights = c(0.4,1), 
+                                        align = "v", axis = "r")
+              
+  }
+  return(plotList)
+}
 
 
 ### TrueVSPredictedPlot ###############################
