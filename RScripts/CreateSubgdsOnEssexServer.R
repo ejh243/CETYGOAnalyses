@@ -110,3 +110,55 @@ ggplot(plot,  aes(x = PC1, y = PC2, col = pheno)) +
   geom_point() +
   theme_cowplot(18)
 
+
+
+### Compare my prediction with minfi for blood cell types
+## load the data
+library(gdsfmt)
+library(minfi)
+x = openfn.gds("/storage/st05d/deepmelon/GEOClod.gds", readonly=TRUE, allow.duplicate=FALSE, allow.fork=FALSE)
+
+pheno = cbind.data.frame(dDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "DatasetOrigin")),
+                         tDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "Tissue")))
+
+cellIndex = pheno$tDat == "B Cells" |
+  pheno$tDat == "Granulocyes" |
+  pheno$tDat == "NK" |
+  pheno$tDat == "T Cells"
+
+pheno = pheno[cellIndex,]
+pheno$tDat = as.factor(as.character(pheno$tDat))
+pheno$dDat = as.factor(as.character(pheno$dDat))
+
+betasIN = read.gdsn(index.gdsn(x, "rawbetas"))[,cellIndex]
+rownames(betasIN) = read.gdsn(index.gdsn(index.gdsn(x$root, "fData"), "Probe_ID"))
+colnames(betasIN) = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "FullBarCode"))[cellIndex]
+
+## load the reference data 
+library(minfi)
+library(wateRmelon)
+library(FlowSorted.Blood.450k)
+library("IlluminaHumanMethylation450kanno.ilmn12.hg19")
+
+compositeCellType = "Blood"
+platform<-"450k"
+referencePkg <- sprintf("FlowSorted.%s.%s", compositeCellType, platform)
+data(list = referencePkg)
+referenceRGset <- get(referencePkg)
+phenoDat = pData(referenceRGset)$CellType
+
+## only keep the 6 wanted cell types
+index = which(phenoDat == "Bcell" | 
+                phenoDat == "CD4T" | 
+                phenoDat == "CD8T" | 
+                phenoDat == "Gran" | 
+                phenoDat == "Mono" | 
+                phenoDat == "NK")
+phenoDat = as.factor(phenoDat[index]) 
+betasREF = referenceRGset[,index]
+betasREF = getBeta(preprocessRaw(betasREF))
+
+for(i in 1:length(levels(pheno$dDat)))
+  ## per dataset, combine with minfi data, normalise using quantile and predict proportions
+normalizeQuantiles()
+
