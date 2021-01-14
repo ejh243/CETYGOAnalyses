@@ -116,8 +116,8 @@ ggplot(plot,  aes(x = PC1, y = PC2, col = pheno)) +
 ## load the data
 library(gdsfmt)
 library(minfi)
-x = openfn.gds("/storage/st05d/deepmelon/GEOClod.gds", readonly=TRUE, allow.duplicate=FALSE, allow.fork=FALSE)
 
+x = openfn.gds("/storage/st05d/deepmelon/GEOClod.gds", readonly=TRUE, allow.duplicate=FALSE, allow.fork=FALSE)
 pheno = cbind.data.frame(dDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "DatasetOrigin")),
                          tDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "Tissue")))
 
@@ -134,31 +134,122 @@ betasIN = read.gdsn(index.gdsn(x, "rawbetas"))[,cellIndex]
 rownames(betasIN) = read.gdsn(index.gdsn(index.gdsn(x$root, "fData"), "Probe_ID"))
 colnames(betasIN) = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "FullBarCode"))[cellIndex]
 
-## load the reference data 
+## load the reference data
 library(minfi)
 library(wateRmelon)
 library(FlowSorted.Blood.450k)
 library("IlluminaHumanMethylation450kanno.ilmn12.hg19")
-
 compositeCellType = "Blood"
 platform<-"450k"
 referencePkg <- sprintf("FlowSorted.%s.%s", compositeCellType, platform)
 data(list = referencePkg)
 referenceRGset <- get(referencePkg)
 phenoDat = pData(referenceRGset)$CellType
-
 ## only keep the 6 wanted cell types
-index = which(phenoDat == "Bcell" | 
-                phenoDat == "CD4T" | 
-                phenoDat == "CD8T" | 
-                phenoDat == "Gran" | 
-                phenoDat == "Mono" | 
+index = which(phenoDat == "Bcell" |
+                phenoDat == "CD4T" |
+                phenoDat == "CD8T" |
+                phenoDat == "Gran" |
+                phenoDat == "Mono" |
                 phenoDat == "NK")
-phenoDat = as.factor(phenoDat[index]) 
+phenoDat = as.factor(phenoDat[index])
 betasREF = referenceRGset[,index]
 betasREF = getBeta(preprocessRaw(betasREF))
 
-for(i in 1:length(levels(pheno$dDat)))
+## match rows in the data
+betasIN = betasIN[which(rownames(betasIN) %in% rownames(betasREF)),]
+betasIN = betasIN[match(rownames(betasREF), rownames(betasIN)),]
+all(rownames(betasIN) == rownames(betasREF))
+
+
+datasetIndex = 1
+
+source("~/DSRMSE/pickCompProbes.R")
+source("~/DSRMSE/projectCellTypeWithError.R")
+
+
+
+normNPred = function(datasetIndex, betasREF, betasIN, pheno, phenoDat){
   ## per dataset, combine with minfi data, normalise using quantile and predict proportions
-normalizeQuantiles()
+  
+  ## subset for study
+  betasStudy = betasIN[, pheno$dDat == levels(pheno$dDat)[datasetIndex]]
+  
+  ## normalise together
+  betasNorm = normalizeQuantiles(cbind(betasREF, betasStudy))
+  
+  ## remove all rows with NAs
+  betasNorm = betasNorm[which(apply(betasNorm, 1, function(x){sum(is.na(x))==0})),]
+  
+  ## create model
+  model = pickCompProbes(rawbetas = betasNorm[,1:ncol(betasREF)],
+                         cellTypes = levels(phenoDat),
+                         cellInd = phenoDat,
+                         numProbes =  150,
+                         probeSelect = "auto")
+ 
+  ## project cell proportions 
+  return(projectCellTypeWithError(betasNorm[,37:ncol(betasNorm)], 
+                                  model = "ownModel", 
+                                  ownModelData = model)) 
+}
+
+pred = lapply(1:length(levels(pheno$dDat)), normNPred, betasREF, betasIN, pheno, phenoDat)
+
+pheno$dDat = as.factor(unlist(strsplit(as.character(pheno$dDat), ".g"))[seq(1,nrow(pheno)*2, 2)])
+
+## unlist pred
+pdat = data.frame(pred[[1]][,1:6], DatasetOrigin = rep(levels(pheno$dDat)[1],nrow(pred[[1]])))
+for (i in 2:length(pred)){
+  pdat = rbind.data.frame(pdat, 
+                          data.frame(pred[[i]][,1:6], 
+                                     DatasetOrigin = rep(levels(pheno$dDat)[i],nrow(pred[[i]]))))
+}
+
+save(pdat, file = "minfiPred.Rdata")
+
+## make sample a column
+pdat$Sample = rownames(pdat)
+
+library(reshape2)
+
+minfiDat = melt(pdat, id.vars = c("Sample", "DatasetOrigin"), 
+                meause.vars = c("Bcell", "CD4T", "CD8T", "Gran", "Mono", "NK"))
+colnames(minfiDat)[3:4] = c("CellType", "minfi.Value")
+
+
+## load my predictions
+dsPred = openfn.gds("~/sub.gds", readonly=TRUE, allow.duplicate=FALSE, allow.fork=FALSE)
+
+dsDat = data.frame(read.gdsn(index.gdsn(dsPred$root, "Pred"))[,1:7], 
+                   Sample = read.gdsn(index.gdsn(dsPred$root, "colnames")))
+colnames(dsDat) = c("Bcell", "CD4T", "CD8T", "Gran", "Mono", "NK", "error", "Sample")
+
+dsDat = dsDat[dsDat$Sample %in% pdat$Sample,]
+dsDat = dsDat[match(pdat$Sample, dsDat$Sample),]
+
+errorDat = melt(dsDat, id.vars = c("Sample", "error"), 
+                meause.vars = c("Bcell", "CD4T", "CD8T", "Gran", "Mono", "NK"))
+
+colnames(errorDat)[3:4] = c("CellType", "DSRMSE.Value")
+
+## merge together
+plotDat = merge(x = minfiDat, y = errorDat, by = c("Sample", "CellType"), all = T)
+
+library(ggplot2)
+library(cowplot)
+library(viridis)
+
+pdf("MinfiVSMyPredForValidation.pdf", height = 7, width = 8)
+ggplot(plotDat, aes(x = DSRMSE.Value, y = minfi.Value, col = error, shape = CellType)) +
+  geom_point() + 
+  scale_color_viridis() +
+  theme_cowplot(18) +
+  labs(x = "Unnormalised model predictions", y = "Minfi predictions", 
+       col = "DSRMSE", shape = "Cell type") +
+  annotate("text", x = 0.1, y = 1, size = 5,
+           label = paste("Cor =", signif(cor(plotDat$DSRMSE.Value, plotDat$minfi.Value), 3)))
+dev.off()
+
+
 
