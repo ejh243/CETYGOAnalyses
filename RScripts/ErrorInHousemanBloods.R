@@ -92,7 +92,7 @@ quantileBetas = getBeta(preprocessQuantile(betas, fixOutliers = TRUE,
 save(quantileBetasTrain, quantileBetasTest, quantileBetas, phenoTest, phenoTrain, pheno,
      file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
 
-## plot PCA of betas per cell type coloured by train test
+### plot PCA of betas per cell type coloured by train test ######
 load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
 library(ggfortify)
 library(ggplot2)
@@ -101,7 +101,6 @@ library(scales)
 
 plotDat = list()
 colours = hue_pal()(6)
-shapes = c(16, 17, 15, 3, 7, 8)
 for (i in 1:length(levels(pheno$celltype))){
   dat = betas[, pheno$celltype == levels(pheno$celltype)[i]]
   datPheno = pheno[pheno$celltype == levels(pheno$celltype)[i],]
@@ -114,27 +113,35 @@ for (i in 1:length(levels(pheno$celltype))){
     theme(legend.position = "none")
 }
 
-
-pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellTrainTestPCA.pdf", height = 7, width = 10)
-plot_grid(plotDat[[1]],
-          plotDat[[2]],
-          plotDat[[3]],
-          plotDat[[4]],
-          plotDat[[5]],
-          plotDat[[6]],
-          ncol = 3, labels = "AUTO")
-dev.off()
-
-## full PCA to show celltype similarity
-betaVar = apply(betas, 1, var, na.rm = T)
-topBeta = betas[order(betaVar, decreasing = T)[1:1000],]
-plotDatPCAFULL = autoplot(prcomp(t(topBeta)), data = pheno, col = "celltype", shape = "celltype", size = 2) +
+plotsnoLeg = plot_grid(plotDat[[1]],
+                       plotDat[[2]],
+                       plotDat[[3]],
+                       plotDat[[4]],
+                       plotDat[[5]],
+                       plotDat[[6]],
+                       ncol = 3, labels = "AUTO")
+legplot = ggplot(data.frame(one = betas[1, 1:10], two = betas[2, 1:10], tt = rep(c("Train", "Test"), 5)),
+                 aes(x = one, y = two, shape = tt)) + 
+  geom_point(size = 2) +
+  labs(shape = "") +
   theme_cowplot(18)
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellPCA.pdf",height = 7, width = 7)
-plotDatPCAFULL +
-  labs(col = "Cell type", shape = "Cell type")
+pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellTrainTestPCA.pdf", height = 9, width = 12)
+plot_grid(plotsnoLeg, get_legend(legplot), 
+          ncol = 2,
+          rel_widths = c(3, 0.3))
 dev.off()
+
+# ## full PCA to show celltype similarity
+# betaVar = apply(betas, 1, var, na.rm = T)
+# topBeta = betas[order(betaVar, decreasing = T)[1:1000],]
+# plotDatPCAFULL = autoplot(prcomp(t(topBeta)), data = pheno, col = "celltype", shape = "celltype", size = 2) +
+#   theme_cowplot(18)
+# 
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellPCA.pdf",height = 7, width = 7)
+# plotDatPCAFULL +
+#   labs(col = "Cell type", shape = "Cell type")
+# dev.off()
 
 
 ### Check effect of normalisation #####################
@@ -195,7 +202,7 @@ absDiffnormModUnDat = abs(normModUnDatMelt[,3] - melt(trueProp)[,3])
 
 
 plotDat = data.frame(diff = c(absDiffUn, absDiffComb, absDiffSep, absDiffunModNormDat, absDiffnormModUnDat), 
-                     norm = rep(c("Unnormalised", "Seperate", "Combined", "Unnormalised Train\nNormalised Test", "Normalised Train\nUnnormalised Test"), each = length(absDiffComb)),
+                     norm = rep(c("UU", "N", "NN", "UN", "NU"), each = length(absDiffComb)),
                      cell = as.factor(c(as.character(unnormMelt[,2]), as.character(sepMelt[,2]), as.character(combMelt[,2]), as.character(sepMelt[,2]), as.character(sepMelt[,2]))))
 
 ## use a paired t-test to compare each group to comb, the default
@@ -205,7 +212,7 @@ xtable(rbind.data.frame(t.testMatrix(dat), mean = signif(colMeans(dat),3),
                         SD = signif(apply(dat, 2, sd),3)))
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/sepCombNormalisationComparison.pdf", 
-    height = 7, width = 11)
+    height = 5, width = 8)
 ggplot(plotDat, aes(x = norm, y = diff)) +
   geom_violin() +
   geom_jitter(aes(col = cell, shape = cell)) +
@@ -248,13 +255,14 @@ cpg = c(1:25,seq(30,55,5), seq(60, 200, 10))
 trueProp = singleCellProportionMatrix(phenoTest[,1])
 rmseTvP = c()
 
-RMSE = function(m, o){
-  sqrt(mean((m - o)^2))
-}
+# RMSE = function(m, o){
+#   sqrt(mean((m - o)^2))
+# }
+
 
 for (i in 1:length(cpg)) {
   pred = projectCellTypeWithError(betasTest,  modelType = "ownModel", ownModelData = modelListCpG[[i]])
-  rmseTvP = c(rmseTvP, RMSE(melt(trueProp)[,3], melt(pred[,-which(colnames(pred) %in% c("nCGmissing", "error"))])[,3]))
+  rmseTvP = c(rmseTvP, mean(abs(melt(trueProp)[,3] - melt(pred[,-which(colnames(pred) %in% c("nCGmissing", "error"))])[,3])))
 }
 
 
@@ -264,7 +272,7 @@ pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/nCpGNeededForModel.p
 ggplot(corPlot, aes(x = cpg, y = rmseTvP)) +
   geom_point() +
   theme_cowplot(18) +
-  labs(x = "Number of CpGs", y = "RMSE")
+  labs(x = "Number of CpGs", y = "Absolute difference between\ntrue and predicted")
 dev.off()
 
 ## save model that used 150 CpGs
@@ -298,11 +306,28 @@ col = list(Celltype = c("Bcell" = "#F8766D", "CD4T" = "#B79F00",
 ha <- HeatmapAnnotation(Celltype = phenoTrain$celltype,
                         col = col)
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/heatmapForModelCpGs.pdf", height = 8, width = 7)
+pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/heatmapForModelCpGs.pdf", height = 6, width = 5)
 Heatmap(modelBetas, name = "DNAm",
         top_annotation = ha, show_row_names = F, show_column_names = F, show_row_dend = F)
 dev.off()
 
+### plot PCA of model CpGs ############################
+## full PCA to show celltype similarity
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+
+library(ggfortify)
+library(ggplot2)
+library(cowplot)
+library(scales)
+
+pheno = data.frame(celltype = colnames(HousemanBlood150CpGModel$coefEsts))
+plotDatPCAFULL = autoplot(prcomp(t(HousemanBlood150CpGModel$coefEsts)), data = pheno, col = "celltype", shape = "celltype", size = 2) +
+  theme_cowplot(18)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.pdf",height = 6, width = 6)
+plotDatPCAFULL +
+  labs(col = "Cell type", shape = "Cell type")
+dev.off()
 
 
 ### Create models using 3:6 cell types ################
