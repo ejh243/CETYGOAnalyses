@@ -672,6 +672,15 @@ dat$blood[dat$Tissue == "Blood" |
             dat$Tissue == "Lymph Node" |
             dat$Tissue == "T Cells"] = 1
 
+## merge bloods for plot
+dat$Tissue[dat$Tissue == "Blood" |
+            dat$Tissue == "B Cells" |
+            dat$Tissue == "Granulocyes" |
+            dat$Tissue == "Neutrophils" |
+            dat$Tissue == "NK" |
+            dat$Tissue == "Lymph Node" |
+            dat$Tissue == "T Cells"] = "Blood"
+
 ## close gds 
 closefn.gds(gfile)
 
@@ -679,14 +688,30 @@ closefn.gds(gfile)
 library(ggplot2)
 library(cowplot)
 library(forcats)
+library(dplyr)
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexsAllTissueBoxplot.pdf", height = 9, width = 13)
-ggplot(dat, aes(x = fct_reorder(Tissue, blood, .fun = median, .desc =TRUE), y = error, fill = as.factor(blood))) +
-  geom_boxplot() +
+dat_summary = dat %>%
+  group_by(Tissue) %>%
+  tally()
+
+dat = merge(dat, dat_summary,  by = "Tissue")
+
+dat$Tissue = as.factor(as.character(dat$Tissue))
+pos = c()
+for(i in 1:length(levels(dat$Tissue))){
+  pos = c(pos, max(dat$error[dat$Tissue == levels(dat$Tissue)[i]]))
+}
+
+dat.pos = data.frame(Tissue = levels(dat$Tissue), pos, n = dat_summary$n)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexsAllTissueBoxplot.pdf", height = 9, width = 14)
+ggplot(dat, aes(x = fct_reorder(Tissue, blood, .fun = median, .desc =TRUE))) +
+  geom_boxplot(aes(y = error, fill = as.factor(blood))) +
   theme_cowplot(18) +
   scale_fill_manual(values = c("#0A8ABA", "#BA3A0A"), name = "Blood?", labels = c("No", "Yes")) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-  labs(x = element_blank(), y = "DSRMSE")
+  labs(x = element_blank(), y = "DSRMSE") +
+  geom_text(data = dat.pos, aes(Tissue, label = n, y = pos+0.02))
 dev.off()
 
 ## t test between blood and non blood samples
