@@ -420,6 +420,22 @@ dev.off()
 
 ## compare those with only 5 to simplify the question
 plotDat5 = plotDatBox[plotDatBox$sums == 5, ]
+plotDat5$mod = as.factor(unlist(strsplit(as.character(plotDat5$model), "l_"))[seq(2,nrow(plotDat5)*2,2)],
+                         levels = c("C4C8GMNK", "BC8GMNK", "BC4GMNK", "BC4C8GNK", "BC4C8MNK", "BC4C8GM"))
+
+
+## violin plot of 5 cell types only
+pdf("/mnt/data1/Thea/ErrorMetric/plots/badModels/violin5CelltypeModels.pdf", height = 6, width = 6)
+ggplot(plotDat5, aes(x = mod, y = error, fill = mod)) +
+  geom_violin() +
+  theme_cowplot(18) +
+  labs(x = "Model", y = "DSRMSE") +
+  ylim(c(0, max(plotDat5$error))) +
+  scale_x_discrete(limits = c("C4C8GMNK", "BC8GMNK", "BC4GMNK", "BC4C8GNK", "BC4C8MNK", "BC4C8GM")) +
+  theme(legend.position = "none", 
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+dev.off()
+
 
 model5Index = which(rowSums(designMatrix) == 5)
 models5 = modelList[model5Index]
