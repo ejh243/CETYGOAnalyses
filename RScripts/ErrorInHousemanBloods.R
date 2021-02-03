@@ -639,25 +639,28 @@ pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/sexAcrossEXandUS.pdf",
 ggplot(allPheno, aes(x = data, y = error, fill = sex)) +
   geom_violin() +
   theme_cowplot(18) +
-  labs(y = "DSRMSE", x = "Data set", fill = "Sex")
+  labs(y = "DSRMSE", x = "Dataset", fill = "Sex")
 dev.off()
 
+## create age from 38 phenotype
+allPheno$ageDiff = abs(as.numeric(as.character(allPheno$age))-38)
+
 pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/ageAcrossEXandUS.pdf", height = 7, width = 7) 
-ggplot(allPheno, aes(x = as.numeric(age), y = error, col = data)) +
+ggplot(allPheno, aes(x = ageDiff, y = error, col = data)) +
   geom_point() +
   theme_cowplot(18) +
-  labs(y = "DSRMSE", x = "Age", col = "Data")
+  labs(y = "DSRMSE", x = "Absolute age difference", col = "Dataset")
 dev.off()
 
 t.test(allPheno[allPheno$sex == "Female","error"], allPheno[allPheno$sex == "Male","error"], alternative = "greater")
 
-summary(lm(error ~ as.numeric(age), data = allPheno))
+summary(lm(error ~ ageDiff, data = allPheno))
 
 
 
 
 
-### Plot outputs from Essex data
+### Plot outputs from Essex data ######################
 ## open gds and make into matrix
 library(gdsfmt)
 gfile = openfn.gds("/mnt/data1/Thea/ErrorMetric/data/EssexOutput/sub.gds")
@@ -688,14 +691,14 @@ dat$blood[dat$Tissue == "Blood" |
             dat$Tissue == "Lymph Node" |
             dat$Tissue == "T Cells"] = 1
 
-## merge bloods for plot
-dat$Tissue[dat$Tissue == "Blood" |
-            dat$Tissue == "B Cells" |
-            dat$Tissue == "Granulocyes" |
-            dat$Tissue == "Neutrophils" |
-            dat$Tissue == "NK" |
-            dat$Tissue == "Lymph Node" |
-            dat$Tissue == "T Cells"] = "Blood"
+# ## merge bloods for plot
+# dat$Tissue[dat$Tissue == "Blood" |
+#             dat$Tissue == "B Cells" |
+#             dat$Tissue == "Granulocyes" |
+#             dat$Tissue == "Neutrophils" |
+#             dat$Tissue == "NK" |
+#             dat$Tissue == "Lymph Node" |
+#             dat$Tissue == "T Cells"] = "Blood"
 
 ## close gds 
 closefn.gds(gfile)
@@ -706,13 +709,13 @@ library(cowplot)
 library(forcats)
 library(dplyr)
 
-dat_summary = dat %>%
-  group_by(Tissue) %>%
-  tally()
-
-dat = merge(dat, dat_summary,  by = "Tissue")
-
-dat$Tissue = as.factor(as.character(dat$Tissue))
+# dat_summary = dat %>%
+#   group_by(Tissue) %>%
+#   tally()
+# 
+# dat = merge(dat, dat_summary,  by = "Tissue")
+#
+# dat$Tissue = as.factor(as.character(dat$Tissue))
 pos = c()
 for(i in 1:length(levels(dat$Tissue))){
   pos = c(pos, max(dat$error[dat$Tissue == levels(dat$Tissue)[i]]))
@@ -774,6 +777,9 @@ datB$trueProp[datB$Tissue == "Granulocyes"] = datB$Gran[datB$Tissue == "Granuloc
 datB$trueProp[datB$Tissue == "NK"] = datB$NK[datB$Tissue == "NK"]
 datB$trueProp[datB$Tissue == "T Cells"] = datB$CD4T[datB$Tissue == "T Cells"] + datB$CD8T[datB$Tissue == "T Cells"]
 
+datB$Tissue = as.character(datB$Tissue)
+datB$Tissue[datB$Tissue == "Granulocyes"] = "Granulocytes"
+datB$Tissue = as.factor(as.character(datB$Tissue))
 
 ##  plot a grid of one cell type at a time
 plot = list()
@@ -782,13 +788,13 @@ for (i in 1:4){
                      aes(x = trueProp, y = error, col = DatasetOrigin)) +
     geom_point(size = 2) +
     theme_cowplot(18) +
-    labs(x = "True proportion", y = "DSRMSE", coll = "Data") +
+    labs(x = "Predicted proportion", y = "DSRMSE", coll = "Data") +
     xlim(c(min(datB$trueProp),max(datB$trueProp))) +
     ylim(c(0, max(datB$error))) +
     ggtitle(levels(as.factor(as.character(datB$Tissue)))[i])
 }
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodCellTypevsError.pdf", height = 10, width = 10)
+pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodCellTypevsError.pdf", height = 10, width = 15)
 plot_grid(plot[[1]], plot[[2]], plot[[3]], plot[[4]], labels = "AUTO")
 dev.off()
 
@@ -797,9 +803,12 @@ dev.off()
 ## B cells
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 
-predictions = datB[datB$Tissue == "T Cells",]
+# predictions = datB[datB$Tissue == "T Cells",]
+# 
+# temp = cellTypeCompareStackedBar(predictions)
 
-temp = cellTypeCompareStackedBar(predictions)
+datB = datB[,-which(colnames(datB) =="Sample")]
+
 
 plotList = list()
 datB$Tissue = as.factor(as.character(datB$Tissue))
@@ -809,11 +818,17 @@ for(i in 1:length(levels(datB$Tissue))){
                  datB[datB$Tissue == levels(datB$Tissue)[i],]))
 }
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar.pdf")
-for(i in 1:length(plotList)){
-  print(plotList[[i]])
-}
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar.pdf")
+# for(i in 1:length(plotList)){
+#   print(plotList[[i]])
+# }
+# dev.off()
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBarExample.pdf", height = 9, width = 7)
+print(plotList[[3]])
 dev.off()
+
+
 
 ## plot trueProp against 1-sum(predicted)
 datB$totalPred = rowSums(datB[,c("Bcell", "CD4T", "CD8T","Gran", "Mono","NK")])
@@ -838,3 +853,57 @@ levels(as.factor(as.character(datBad$DatasetOrigin)))
 ## get sample IDs for samples in GSE89251 with low error, bad pred and those with higher error
 datBad[datBad$DatasetOrigin == "GSE89251" & datBad$trueProp < 0.5,"Sample"]
 datB[datB$DatasetOrigin == "GSE89251" & datB$error > 0.2,"Sample"]
+
+
+
+### Predict proportions in E risk purified samples (just those that overlap) ####
+library(minfi)
+load("/mnt/data1/Eilis/Projects/Asthma/QC/CombinedQC_WithMarkdown/AllRGSet.rdat")
+betas = getBeta(preprocessRaw(RGSet))
+
+pheno = read.csv("/mnt/data1/Eilis/Projects/Asthma/QC/CombinedQC_WithMarkdown/CellSortedAsthmaERisk_SamplesPassedQC.csv")
+pheno = pheno[,c("Basename", "PatientID", "Sample.Type", "sex", "CD8T", "CD4T", "NK", "Bcell", "Mono", "Gran")]
+
+## only keep cell types in prediction 
+pheno = pheno[which(pheno$Sample.Type == "B-cells" |
+                      pheno$Sample.Type == "CD4 T-cells" |
+                      pheno$Sample.Type == "CD8 T-cells" |
+                      pheno$Sample.Type == "Granulocytes" |
+                      pheno$Sample.Type == "Monocytes"),]
+
+## subset betas for those in pheno
+betas = betas[,colnames(betas) %in% pheno$Basename]
+# all(colnames(betas) == pheno$Basename)  # T
+
+## Use model to predict cell types
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+
+pred = projectCellTypeWithError(betas, modelType = "ownModel", ownModelData = HousemanBlood150CpGModel)
+
+## summarise data for plotting
+predNames =  c("CD4T", "CD8T", "Bcell", "Gran", "Mono")
+eRiskNames = c("CD4 T-cells","CD8 T-cells", "B-cells", "Granulocytes", "Monocytes")
+cellP = cellM = Celltype = error = c()
+
+for (i in 1:length(predNames)){
+  temp = pred[pheno$Sample.Type == eRiskNames[i],]
+  cellP = c(cellP, temp[,colnames(temp) == predNames[i]])
+  Celltype = c(Celltype, rep(predNames[i], nrow(temp)))
+  error = c(error, temp[,"error"])
+  pTemp = pheno[pheno$Sample.Type == eRiskNames[i],]
+  cellM = c(cellM, pTemp[,colnames(pTemp) == predNames[i]])
+}
+
+plotDat = data.frame(cellP, cellM, Celltype, error)
+
+library(ggplot2)  
+library(cowplot)  
+
+ggplot(plotDat, aes(x = cellP, y = error, col = Celltype)) +
+  geom_point() +
+  theme_cowplot(18)
+
+ggplot(plotDat, aes(x = cellP, y = cellM, col = error)) +
+  geom_point() +
+  theme_cowplot(18)
