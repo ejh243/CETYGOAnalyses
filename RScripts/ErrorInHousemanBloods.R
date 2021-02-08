@@ -490,9 +490,19 @@ pdf("/mnt/data1/Thea/ErrorMetric/plots/badModels/errorOnly5Celltypes.pdf", heigh
 ggplot(erPlotDat, aes(x = sample, y = error, col = model)) +
   geom_point() +
   theme_cowplot(18) +
-  theme(axis.text.x=element_blank(),
-        axis.ticks.x=element_blank()) +
-  labs(x = "Sample", y = "DSRMSE", col = "Model") +
+  # theme(axis.text.x=element_blank(),
+        # axis.ticks.x=element_blank()) +
+  scale_x_discrete(labels = c("Sa" = "0.1",
+                              "Sb" = "0.2",
+                              "Sc" = "0.3",
+                              "Sd" = "0.4",
+                              "Se" = "0.5",
+                              "Sf" = "0.6",
+                              "Sg" = "0.7",
+                              "Sh" = "0.8",
+                              "Si" = "0.9",
+                              "Sj" = "1.0")) +
+  labs(x = "Proportion of missing cell type", y = "DSRMSE", col = "Model") +
   ylim(c(0, max(erPlotDat$error)))
 dev.off()
 
@@ -899,11 +909,39 @@ plotDat = data.frame(cellP, cellM, Celltype, error)
 
 library(ggplot2)  
 library(cowplot)  
+library(scales)
 
-ggplot(plotDat, aes(x = cellP, y = error, col = Celltype)) +
-  geom_point() +
-  theme_cowplot(18)
+colSub = hue_pal()(6)
 
-ggplot(plotDat, aes(x = cellP, y = cellM, col = error)) +
-  geom_point() +
-  theme_cowplot(18)
+## get correlation for each cell type
+core = c()
+for (i in 1:5){ 
+  temp = plotDat[plotDat$Celltype == levels(plotDat$Celltype)[i],]
+  core = c(core, cor(temp$cellP, temp$error))
+}
+core = signif(core,2)
+
+labin = paste(levels(plotDat$Celltype), " (Cor = ", core, ")", sep = "")
+names(labin) = levels(plotDat$Celltype)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/EriskCelltypeError.pdf", height = 11, width = 8)
+ggplot(plotDat, aes(x = cellP, y = error, col = Celltype, shape = Celltype)) +
+  geom_point(size = 2) +
+  scale_color_manual(values = colSub[1:5]) +
+  scale_shape_manual(values = c(20, 17, 15, 3, 7)) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_cowplot(18) +
+  facet_wrap(~Celltype, nrow = 5, labeller = labeller(Celltype = labin)) +
+  labs(x = "Predicted proportion", y = "DSRMSE", col = "Cell type", shape = "Cell type") +
+  theme(legend.position = "none")
+dev.off()
+
+
+
+### check annotation of model CpGs to chromosomes #####
+x = read.csv("/mnt/data1/EPIC_reference/MethylationEPIC_v-1-0_B4.csv", skip = 7, header = T)
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+
+x = x[,c("IlmnID", "CHR")]
+cpgInMod = x[x$IlmnID %in% rownames(HousemanBlood150CpGModel$coefEsts),]
+table(cpgInMod$CHR)
