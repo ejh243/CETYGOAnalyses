@@ -217,14 +217,14 @@ ggplot(plotDat, aes(x = norm, y = diff)) +
   geom_violin() +
   geom_jitter(aes(col = cell, shape = cell)) +
   theme_cowplot(18) +
-  labs(x = "Normalisation", y = "Absolute difference between\ntrue and predicted") +
+  labs(x = "Normalisation", y = "Absolute difference between\ntrue and predicted\n(Proportion of methylation)") +
   theme(legend.title = element_blank())
 dev.off()
 
 
 
 ### Optimise number of CpGs ###########################
-## load normalised data 
+## load unnormalised data 
 load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
 
 ## source model functions
@@ -272,7 +272,7 @@ pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/nCpGNeededForModel.p
 ggplot(corPlot, aes(x = cpg, y = rmseTvP)) +
   geom_point() +
   theme_cowplot(18) +
-  labs(x = "Number of CpGs", y = "Absolute difference between\ntrue and predicted")
+  labs(x = "Number of CpGs", y = "Absolute difference between\ntrue and predicted\n(Proportion of methylation)")
 dev.off()
 
 ## save model that used 150 CpGs
@@ -491,7 +491,7 @@ ggplot(erPlotDat, aes(x = sample, y = error, col = model)) +
   geom_point() +
   theme_cowplot(18) +
   # theme(axis.text.x=element_blank(),
-        # axis.ticks.x=element_blank()) +
+  # axis.ticks.x=element_blank()) +
   scale_x_discrete(labels = c("Sa" = "0.1",
                               "Sb" = "0.2",
                               "Sc" = "0.3",
@@ -945,3 +945,49 @@ load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
 x = x[,c("IlmnID", "CHR")]
 cpgInMod = x[x$IlmnID %in% rownames(HousemanBlood150CpGModel$coefEsts),]
 table(cpgInMod$CHR)
+
+save(cpgInMod, file = "/mnt/data1/Thea/ErrorMetric/data/cpgInModel.Rdata")
+
+### compare X chromosome in model between male and female in EX and US ####
+load("/mnt/data1/Thea/ErrorMetric/data/cpgInModel.Rdata")
+load("/mnt/data1/EPICQC/UnderstandingSociety/US_Betas_Pheno.rda")
+us = dat
+usPheno = pheno
+load("/mnt/data1/EXTEND/Methylation/QC/EXTEND_batch1_2_merged/EXTEND_batches_1_2_normalised_together.rdat")
+ex = betas
+exPheno = pheno
+rm(dat, betas, pheno)
+
+exT = ex[rownames(ex) %in% cpgInMod$IlmnID,]
+usT = us[rownames(us) %in% cpgInMod$IlmnID,]
+
+exT = exT[match(cpgInMod$IlmnID, rownames(exT)),]
+usT = usT[match(cpgInMod$IlmnID, rownames(usT)),]
+
+all(rownames(exT) == cpgInMod$IlmnID)
+all(rownames(usT) == cpgInMod$IlmnID)
+
+## subset for those in the x chromosome
+exT = exT[cpgInMod$CHR == "X",]
+usT = usT[cpgInMod$CHR == "X",]
+
+sexUS = usPheno$nsex
+sexUS = ifelse(sexUS =="1", "Male", "Female")
+
+plotDat = rbind.data.frame(data.frame(t(exT), sampleID = colnames(exT), study = "EX", sex = exPheno$Sex),
+                           data.frame(t(usT), sampleID = colnames(usT), study = "US", sex = sexUS))
+
+library(reshape2)
+plotDat = melt(plotDat, id.vars = c("study", "sex", "sampleID"))
+
+library(ggplot2)
+library(cowplot)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/ErrorXchrCpGsInEXUS.pdf", height = 8, width = 14)
+ggplot(plotDat, aes(x = variable, y = value, fill = sex)) +
+  theme_cowplot(18) +
+  geom_violin(position=position_dodge(0.5)) +
+  facet_wrap(~study, ncol = 1) +
+  labs(y = "Proportion of methylation", fill = "Sex", x = "X chromosome CpGs") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 15))
+dev.off()
