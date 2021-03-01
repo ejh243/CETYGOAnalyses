@@ -265,14 +265,19 @@ for (i in 1:length(cpg)) {
   rmseTvP = c(rmseTvP, mean(abs(melt(trueProp)[,3] - melt(pred[,-which(colnames(pred) %in% c("nCGmissing", "error"))])[,3])))
 }
 
+nCG = c()
+for(i in 1:length(modelListCpG)){
+  nCG = c(nCG, nrow(modelListCpG[[i]]$coefEsts))
+}
 
-corPlot = data.frame(rmseTvP, cpg)
+
+corPlot = data.frame(rmseTvP, cpg, nCG)
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/nCpGNeededForModel.pdf", height = 7, width = 7)
-ggplot(corPlot, aes(x = cpg, y = rmseTvP)) +
+ggplot(corPlot, aes(x = nCG, y = rmseTvP)) +
   geom_point() +
   theme_cowplot(18) +
-  labs(x = "Number of CpGs", y = "Absolute difference between\ntrue and predicted\n(Proportion of methylation)")
+  labs(x = "Number of CpGs in model", y = "Absolute difference between\ntrue and predicted\n(Proportion of methylation)")
 dev.off()
 
 ## save model that used 150 CpGs
@@ -977,6 +982,24 @@ sexUS = ifelse(sexUS =="1", "Male", "Female")
 plotDat = rbind.data.frame(data.frame(t(exT), sampleID = colnames(exT), study = "EX", sex = exPheno$Sex),
                            data.frame(t(usT), sampleID = colnames(usT), study = "US", sex = sexUS))
 
+statDat = data.frame(matrix(nrow = ncol(plotDat)-3, ncol = 5))
+colnames(statDat) = c("CpG", "pValue", "Sig", "meanF", "meanM")
+for (i in 1:(ncol(plotDat)-3)){
+  x = t.test(plotDat[,i]~plotDat[,"sex"])
+  statDat[i,1] = colnames(plotDat)[i]
+  statDat[i,2] = signif(x$p.value, 2)
+  statDat[i,4:5] = signif(x$estimate, 3)
+}
+statDat$Sig[statDat$pValue >= 0.05] = ""
+statDat$Sig[statDat$pValue < 0.05] = "."
+statDat$Sig[statDat$pValue < 0.01] = "*"
+statDat$Sig[statDat$pValue < 0.001] = "**"
+statDat$Sig[statDat$pValue < 0.0001] = "***"
+
+
+library(xtable)
+print(xtable(statDat), include.rownames=FALSE)
+
 library(reshape2)
 plotDat = melt(plotDat, id.vars = c("study", "sex", "sampleID"))
 
@@ -990,4 +1013,74 @@ ggplot(plotDat, aes(x = variable, y = value, fill = sex)) +
   facet_wrap(~study, ncol = 1) +
   labs(y = "Proportion of methylation", fill = "Sex", x = "X chromosome CpGs") +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 15))
+dev.off()
+
+
+### Test number of model CpGs needed for DSRMSE to still work ####
+load("/mnt/data1/Thea/ErrorMetric/data/nCpGModels/nCpGModels.Rdata")
+
+nCG = c()
+for(i in 1:length(modelListCpG)){
+  nCG = c(nCG, nrow(modelListCpG[[i]]$coefEsts))
+}
+
+## mean proportions of each cell type in whole blood (from Reinius2012)
+meanBloodProp = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43)
+sdBloodProp = c(1.44, 3.12, 3.13, 9.19, 3.17, 1.5)
+
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+## load data
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+
+## each cell type will be simulated with mean, mean +- sd, mean +- 2sd
+
+bulk = CellTypeProportionSimulator(GetModelCG(betasTest, modelListCpG),
+                            phenoTest,
+                            phenoColName = "celltype",
+                            nBulk = 30,
+                            proportionsMatrixType = "own",
+                            proportionsMatrix = simPropMaker(meanBloodProp, sdBloodProp))
+
+## add rnorm with varying sd to the sim then predict and plot
+createBulkWGaussian = function(sdIN, bulkBetas){
+  x = apply(bulkBetas, 2, function(y){
+    y = y + rnorm(length(y), 0, sdIN)
+    y[y>1] = 1
+    y[y<0] = 0
+    return(y)
+  })
+  return(x)
+}
+
+sdUsed = c(0.5,0.25, 0)
+
+bulkWError = lapply(sdUsed, createBulkWGaussian, bulk[[1]])
+bulkWError = do.call("cbind", bulkWError)
+
+bulkWErrorPheno = cbind(do.call(rbind, replicate(length(sdUsed), bulk[[2]], simplify=FALSE)), rep(sdUsed, each = nrow(bulk[[2]])))
+colnames(bulkWErrorPheno) = c("Bcell.t", "CD4T.t", "CD8T.t", "Gran.t", "Mono.t", "NK.t", "SD")
+
+
+predWithGaussian = lapply(names(modelListCpG), function(x){projectCellTypeWithError(YIN = bulkWError,
+                                           modelType = "ownModel",
+                                           ownModelData = modelListCpG[[x]])})
+
+predWithGaussian = cbind(do.call("rbind", predWithGaussian), rep(nCG, each = (length(sdUsed)*nrow(bulk[[2]]))))
+colnames(predWithGaussian)[9] = "nModelCG"
+
+plotDat = cbind.data.frame(do.call(rbind, replicate(length(modelListCpG), bulkWErrorPheno, simplify=FALSE)),
+                           predWithGaussian)
+
+library(ggplot2)
+library(cowplot)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/nCpGwithDSRMSE.pdf", height = 7, width = 11)
+ggplot(plotDat, aes(x = as.factor(nModelCG), y = error, fill = as.factor(SD))) +
+  geom_boxplot()+
+  theme_cowplot(18) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  labs(x = "CpGs in model", y = "DSRMSE", fill = "Noise\nSD")
 dev.off()
