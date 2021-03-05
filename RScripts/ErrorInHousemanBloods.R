@@ -749,6 +749,75 @@ dev.off()
 
 
 ### Plot outputs from Essex data ######################
+
+# ## Essex server code:
+# ## open gds file
+# library(gdsfmt)
+# x = openfn.gds("/storage/st05d/deepmelon/GEOClod.gds", readonly=TRUE, allow.duplicate=FALSE, allow.fork=FALSE)
+# 
+# 
+# betas = read.gdsn(index.gdsn(x, "rawbetas"))
+# #dim(betas)
+# 
+# load("~/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+# 
+# pID = read.gdsn(index.gdsn(index.gdsn(x$root, "fData"), "Probe_ID"))
+# betaIndex = pID %in% rownames(HousemanBlood50CpGModel$coefEsts)
+# 
+# rownames(betas) = read.gdsn(index.gdsn(index.gdsn(x$root, "fData"), "Probe_ID"))
+# colnames(betas) = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "FullBarCode"))
+# 
+# betaMod = betas[betaIndex,]
+# betaMod = betaMod[match(rownames(HousemanBlood50CpGModel$coefEsts), rownames(betaMod)),]
+# 
+# ## create column index, removing samples that have "", or unsorted
+# tDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "Tissue"))
+# aDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "Age"))
+# sDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "Sex"))
+# dDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "DatasetOrigin"))
+# stDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "SubTissue"))
+# tInd = which(tDat == "" | 
+#                tDat == "Unsorted Tissues" | 
+#                tDat == "Unsorted Cell Line" | 
+#                tDat == "Unsorted Tumours")
+# 
+# betaMod = betaMod[,-tInd]
+# 
+# gfile = createfn.gds("sub.gds")
+# 
+# add.gdsn(gfile, "Age", aDat[-tInd])
+# add.gdsn(gfile, "Sex", sDat[-tInd])
+# add.gdsn(gfile, "Tissue", tDat[-tInd])
+# add.gdsn(gfile, "DatasetOrigin", dDat[-tInd])
+# add.gdsn(gfile, "SubTissue", stDat[-tInd])
+# add.gdsn(gfile, "rownames", rownames(betaMod))
+# add.gdsn(gfile, "colnames", colnames(betaMod))
+# 
+# #source("~/DSRMSE/FunctionsForErrorTesting.R")
+# source("~/DSRMSE/projectCellTypeWithError.R")
+# model = HousemanBlood50CpGModel
+# 
+# ind = c(seq(1000, 20960, 1000))
+# errPred = lapply(ind, function(ind){
+#   pred = projectCellTypeWithError(betaMod[,(ind - 999):ind], model = "ownModel", ownModelData = model)
+#   return(pred)})
+# 
+# errPred[[length(errPred)+1]] = projectCellTypeWithError(betaMod[,20001:20960], model = "ownModel", ownModelData = model)
+# 
+# ## extract all from list and add to gds file
+# pred = errPred[[1]]
+# for (i in 2:length(errPred)){
+#   pred = rbind(pred, errPred[[i]])
+# }
+# 
+# add.gdsn(gfile, "Pred", pred)
+# closefn.gds(gfile)
+# closefn.gds(x)
+# q()
+# 
+# scp sub.gds dSeiler@knight.ex.ac.uk:/mnt/data1/Thea/ErrorMetric/data/EssexOutput/
+#   
+
 ## open gds and make into matrix
 library(gdsfmt)
 gfile = openfn.gds("/mnt/data1/Thea/ErrorMetric/data/EssexOutput/sub.gds")
@@ -779,14 +848,15 @@ dat$blood[dat$Tissue == "Blood" |
             dat$Tissue == "Lymph Node" |
             dat$Tissue == "T Cells"] = 1
 
-# ## merge bloods for plot
-# dat$Tissue[dat$Tissue == "Blood" |
-#             dat$Tissue == "B Cells" |
-#             dat$Tissue == "Granulocyes" |
-#             dat$Tissue == "Neutrophils" |
-#             dat$Tissue == "NK" |
-#             dat$Tissue == "Lymph Node" |
-#             dat$Tissue == "T Cells"] = "Blood"
+## merge bloods for plot
+dat$TissueBlood = dat$Tissue
+dat$TissueBlood[dat$Tissue == "Blood" |
+            dat$Tissue == "B Cells" |
+            dat$Tissue == "Granulocyes" |
+            dat$Tissue == "Neutrophils" |
+            dat$Tissue == "NK" |
+            dat$Tissue == "Lymph Node" |
+            dat$Tissue == "T Cells"] = "Blood"
 
 ## close gds 
 closefn.gds(gfile)
@@ -797,62 +867,62 @@ library(cowplot)
 library(forcats)
 library(dplyr)
 
-# dat_summary = dat %>%
-#   group_by(Tissue) %>%
-#   tally()
-# 
-# dat = merge(dat, dat_summary,  by = "Tissue")
-#
-# dat$Tissue = as.factor(as.character(dat$Tissue))
+dat_summary = dat %>%
+  group_by(TissueBlood) %>%
+  tally()
+
+dat = merge(dat, dat_summary,  by = "TissueBlood")
+
+dat$TissueBlood = as.factor(as.character(dat$TissueBlood))
 pos = c()
-for(i in 1:length(levels(dat$Tissue))){
-  pos = c(pos, max(dat$error[dat$Tissue == levels(dat$Tissue)[i]]))
+for(i in 1:length(levels(dat$TissueBlood))){
+  pos = c(pos, max(dat$error[dat$Tissue == levels(dat$TissueBlood)[i]]))
 }
 
-dat.pos = data.frame(Tissue = levels(dat$Tissue), pos, n = dat_summary$n)
+dat.pos = data.frame(TissueBlood = levels(dat$TissueBlood), pos, n = dat_summary$n)
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexsAllTissueBoxplot.pdf", height = 9, width = 14)
-ggplot(dat, aes(x = fct_reorder(Tissue, blood, .fun = median, .desc =TRUE))) +
+ggplot(dat, aes(x = fct_reorder(TissueBlood, blood, .fun = median, .desc =TRUE))) +
   geom_boxplot(aes(y = error, fill = as.factor(blood))) +
   theme_cowplot(18) +
   scale_fill_manual(values = c("#0A8ABA", "#BA3A0A"), name = "Blood?", labels = c("No", "Yes")) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
   labs(x = element_blank(), y = "DSRMSE") +
-  geom_text(data = dat.pos, aes(Tissue, label = n, y = pos+0.02))
+  geom_text(data = dat.pos, aes(TissueBlood, label = n, y = pos+0.02))
 dev.off()
 
 ## t test between blood and non blood samples
 t.test(dat$error[dat$blood ==0], dat$error[dat$blood ==1])
 
-## plot the same for only blood
-datB = dat[dat$blood == 1,]
-pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodBoxplot.pdf", height = 10, width = 16)
-ggplot(datB, aes(x = fct_reorder(DatasetOrigin, error, .fun = median, .desc =F), y = error, fill = "#BA3A0A")) +
-  geom_boxplot() +
-  theme_cowplot(18) +
-  theme(legend.position = "none", axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.text.x.bottom = element_text(size=12)) +
-  labs(x = "Study", y = "DSRMSE")
-dev.off()
-
-
-## check relationship with age
-## remove those without age or sex
-datBAS = datB[!datB$Sex == "",]
-pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodSexCheck.pdf", height = 10, width = 16)
-ggplot(datBAS, aes(x = fct_reorder(DatasetOrigin, error, .fun = median, .desc =F), y = error, fill = as.factor(as.character(Sex)))) +
-  geom_boxplot() +
-  theme_cowplot(18) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.text.x.bottom = element_text(size=12)) +
-  labs(x = "Study", y = "DSRMSE", fill = "Sex")
-dev.off()
-
-pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodAgeCheck.pdf", height = 13, width = 9)
-ggplot(datBAS, aes(x = as.numeric(as.character(Age)), y = error, col = as.factor(as.character(DatasetOrigin)))) +
-  geom_point(size = 1.4) +
-  theme_cowplot(18) +
-  theme(legend.position = "bottom", legend.text = element_text(size=12)) +
-  labs(x = "Age", y = "DSRMSE", col = "Study") 
-dev.off()
+# ## plot the same for only blood
+# datB = dat[dat$blood == 1,]
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodBoxplot.pdf", height = 10, width = 16)
+# ggplot(datB, aes(x = fct_reorder(DatasetOrigin, error, .fun = median, .desc =F), y = error, fill = "#BA3A0A")) +
+#   geom_boxplot() +
+#   theme_cowplot(18) +
+#   theme(legend.position = "none", axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.text.x.bottom = element_text(size=12)) +
+#   labs(x = "Study", y = "DSRMSE")
+# dev.off()
+# 
+# 
+# ## check relationship with age
+# ## remove those without age or sex
+# datBAS = datB[!datB$Sex == "",]
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodSexCheck.pdf", height = 10, width = 16)
+# ggplot(datBAS, aes(x = fct_reorder(DatasetOrigin, error, .fun = median, .desc =F), y = error, fill = as.factor(as.character(Sex)))) +
+#   geom_boxplot() +
+#   theme_cowplot(18) +
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.text.x.bottom = element_text(size=12)) +
+#   labs(x = "Study", y = "DSRMSE", fill = "Sex")
+# dev.off()
+# 
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodAgeCheck.pdf", height = 13, width = 9)
+# ggplot(datBAS, aes(x = as.numeric(as.character(Age)), y = error, col = as.factor(as.character(DatasetOrigin)))) +
+#   geom_point(size = 1.4) +
+#   theme_cowplot(18) +
+#   theme(legend.position = "bottom", legend.text = element_text(size=12)) +
+#   labs(x = "Age", y = "DSRMSE", col = "Study") 
+# dev.off()
 
 ## select purified blood cell types
 datB = dat[dat$blood == 1,]
@@ -896,7 +966,8 @@ source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 # temp = cellTypeCompareStackedBar(predictions)
 
 datB = datB[,-which(colnames(datB) =="Sample")]
-
+datB = datB[,-which(colnames(datB) =="n")]
+datB = datB[,-which(colnames(datB) =="TissueBlood")]
 
 plotList = list()
 datB$Tissue = as.factor(as.character(datB$Tissue))
@@ -941,6 +1012,56 @@ levels(as.factor(as.character(datBad$DatasetOrigin)))
 ## get sample IDs for samples in GSE89251 with low error, bad pred and those with higher error
 datBad[datBad$DatasetOrigin == "GSE89251" & datBad$trueProp < 0.5,"Sample"]
 datB[datB$DatasetOrigin == "GSE89251" & datB$error > 0.2,"Sample"]
+
+
+### comparison to estimateCellCounts.wmln #############
+# library(gdsfmt)
+# x = openfn.gds("/storage/st05d/deepmelon/GEOClod.gds", readonly=TRUE, allow.duplicate=FALSE, allow.fork=FALSE)
+# 
+# ### comparison to estimateCellCounts.wmln #############
+# library(gdsfmt)
+# x = openfn.gds("/storage/st05d/deepmelon/GEOClod.gds", readonly=TRUE, allow.duplicate=FALSE, allow.fork=FALSE)
+# 
+# library(wateRmelon)
+# library(bigmelon)
+# ## function for creating subgds
+# ##  INPUT newGdsName - name of new file to be saved
+# ##        gfileOld - file to be subset
+# ##        pDataSplit - the pData column the data will be split using
+# ##        pDataVal - the pData value wanted
+# 
+# setwd("~/gdsTemp/")
+# 
+# pDataVal = c("B Cells", "Granulocyes", "NK", "T Cells")
+# newGdsName = "gsub"
+# pDataSplit = "Tissue"
+# gfileOld = x
+# 
+# 
+# createSubGDS = function(pDataVal, newGdsName, pDataSplit, gfileOld){
+#   gfile = createfn.gds(newGdsName)
+#   
+#   ## add fData
+#   add.gdsn(gfile, "fData", fData(x))
+#   
+#   ## get index for col/rows to keep
+#   pCol = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), pDataSplit))
+#   index = which(pCol %in% pDataVal)
+#   
+#   ## add subset pData
+#   add.gdsn(gfile, "pData", pData(x)[index,])
+#   
+#   ## add the rest of the data, subset
+#   add.gdsn(gfile, "rawbetas", read.gdsn(index.gdsn(x, "rawbetas"))[,index])
+#   add.gdsn(gfile, "methylated", read.gdsn(index.gdsn(x, "methylated"))[,index])
+#   add.gdsn(gfile, "unmethylated", read.gdsn(index.gdsn(x, "unmethylated"))[,index])
+#   add.gdsn(gfile, "pvals", read.gdsn(index.gdsn(x, "pvals"))[,index])
+#   add.gdsn(gfile, "NBeads", read.gdsn(index.gdsn(x, "NBeads"))[,index])
+#   
+#   return(gfile)
+# }
+
+
 
 
 
