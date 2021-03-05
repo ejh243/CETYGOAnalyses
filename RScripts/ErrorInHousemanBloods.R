@@ -158,21 +158,21 @@ source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 unnormalisedModel = pickCompProbes(rawbetas = betasTrain,
                                    cellTypes = levels(as.factor(phenoTrain$celltype)),
                                    cellInd = as.factor(phenoTrain$celltype),
-                                   numProbes =  150,
+                                   numProbes =  50,
                                    probeSelect = "auto")
 
 ## create model in separately normalised train data
 sepNormalisedModel = pickCompProbes(rawbetas = quantileBetasTrain,
                                     cellTypes = levels(as.factor(phenoTrain$celltype)),
                                     cellInd = as.factor(phenoTrain$celltype),
-                                    numProbes =  150,
+                                    numProbes =  50,
                                     probeSelect = "auto")
 
 ## create model in combined normalised train data
 combNormalisedModel = pickCompProbes(rawbetas = quantileBetas[, pheno$trainTest == "Train"],
                                      cellTypes = levels(as.factor(phenoTrain$celltype)),
                                      cellInd = as.factor(phenoTrain$celltype),
-                                     numProbes =  150,
+                                     numProbes =  50,
                                      probeSelect = "auto")
 
 ## apply models to their respective test data sets
@@ -234,7 +234,7 @@ source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 
 # ## make models
 # modelListCpG = list()
-# cpg = c(1:25,seq(30,55,5), seq(60, 200, 10))
+# cpg = c(1:25,seq(30,55,5), seq(60, 100, 10))
 # for (i in 1:length(cpg)) {
 #   modelListCpG[[i]] = pickCompProbes(rawbetas = as.matrix(betasTrain),
 #                                      cellTypes = levels(as.factor(phenoTrain$celltype)),
@@ -251,7 +251,7 @@ load("/mnt/data1/Thea/ErrorMetric/data/nCpGModels/nCpGModels.Rdata")
 library(reshape2)
 
 ## predict value of test data for each model
-cpg = c(1:25,seq(30,55,5), seq(60, 200, 10))
+cpg = c(1:25,seq(30,55,5), seq(60, 100, 10))
 trueProp = singleCellProportionMatrix(phenoTest[,1])
 rmseTvP = c()
 
@@ -274,21 +274,22 @@ for(i in 1:length(modelListCpG)){
 corPlot = data.frame(rmseTvP, cpg, nCG)
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/nCpGNeededForModel.pdf", height = 7, width = 7)
-ggplot(corPlot, aes(x = nCG, y = rmseTvP)) +
+ggplot(corPlot, aes(x = cpg, y = rmseTvP)) +
   geom_point() +
   theme_cowplot(18) +
-  labs(x = "Number of CpGs in model", y = "Absolute difference between\ntrue and predicted\n(Proportion of methylation)")
+  labs(x = expression(paste(italic("numProbes"))), 
+                      y = "Absolute difference between\ntrue and predicted\n(Proportion of methylation)")
 dev.off()
 
 ## save model that used 150 CpGs
-HousemanBlood150CpGModel = modelListCpG[[which(cpg == 150)]]
-save(HousemanBlood150CpGModel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+HousemanBlood50CpGModel = modelListCpG[[which(cpg == 50)]]
+save(HousemanBlood50CpGModel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
 
 
 
 ### Plot heirarchical cluster of training cpgs used in model #####
 ## load model
-load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
 
 ## load data
 load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
@@ -296,7 +297,7 @@ load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix
 ## load functions
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 
-modelBetas = GetModelCG(betasTrain, list(HousemanBlood150CpGModel))
+modelBetas = GetModelCG(betasTrain, list(HousemanBlood50CpGModel))
 library(gplots)
 library(viridis)
 library(scales)
@@ -318,15 +319,15 @@ dev.off()
 
 ### plot PCA of model CpGs ############################
 ## full PCA to show celltype similarity
-load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
 
 library(ggfortify)
 library(ggplot2)
 library(cowplot)
 library(scales)
 
-pheno = data.frame(celltype = colnames(HousemanBlood150CpGModel$coefEsts))
-plotDatPCAFULL = autoplot(prcomp(t(HousemanBlood150CpGModel$coefEsts)), data = pheno, col = "celltype", shape = "celltype", size = 2) +
+pheno = data.frame(celltype = colnames(HousemanBlood50CpGModel$coefEsts))
+plotDatPCAFULL = autoplot(prcomp(t(HousemanBlood50CpGModel$coefEsts)), data = pheno, col = "celltype", shape = "celltype", size = 2) +
   theme_cowplot(18)
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.pdf",height = 6, width = 6)
@@ -357,7 +358,7 @@ cellTypeShorthand = c("B", "C4", "C8", "G", "M", "NK")
 #   modelList[[i]] = pickCompProbes(rawbetas = as.matrix(modellingDat[[1]]),
 #                                   cellTypes = levels(as.factor(as.character(modellingDat[[2]]$celltype))),
 #                                   cellInd = as.factor(as.character(modellingDat[[2]]$celltype)),
-#                                   numProbes =  150,
+#                                   numProbes = 50,
 #                                   probeSelect = "auto")
 #   names(modelList)[i] = paste("model", paste(cellTypeShorthand[unlist(designMatrix[i,])], sep = "", collapse = ""), sep = "_")
 # }
@@ -425,8 +426,8 @@ dev.off()
 
 ## compare those with only 5 to simplify the question
 plotDat5 = plotDatBox[plotDatBox$sums == 5, ]
-plotDat5$mod = as.factor(unlist(strsplit(as.character(plotDat5$model), "l_"))[seq(2,nrow(plotDat5)*2,2)],
-                         levels = c("C4C8GMNK", "BC8GMNK", "BC4GMNK", "BC4C8GNK", "BC4C8MNK", "BC4C8GM"))
+plotDat5$mod = factor(unlist(strsplit(as.character(plotDat5$model), "l_"))[seq(2,nrow(plotDat5)*2,2)],
+                         levels = c("C4C8GMNK", "BC8GMNK", "BC4GMNK", "BC4C8MNK", "BC4C8GNK", "BC4C8GM"))
 
 
 ## violin plot of 5 cell types only
@@ -436,7 +437,7 @@ ggplot(plotDat5, aes(x = mod, y = error, fill = mod)) +
   theme_cowplot(18) +
   labs(x = "Model", y = "DSRMSE") +
   ylim(c(0, max(plotDat5$error))) +
-  scale_x_discrete(limits = c("C4C8GMNK", "BC8GMNK", "BC4GMNK", "BC4C8GNK", "BC4C8MNK", "BC4C8GM")) +
+  scale_x_discrete(limits = c("C4C8GMNK", "BC8GMNK", "BC4GMNK", "BC4C8MNK", "BC4C8GNK", "BC4C8GM")) +
   theme(legend.position = "none", 
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
 dev.off()
@@ -523,7 +524,7 @@ source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 
 ## load model
-load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
 
 ## load testing data
 load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
@@ -546,7 +547,7 @@ testData = CellTypeProportionSimulator(betas = betasTest,
 
 
 stackedWithNoise = ModelCompareStackedBar(testBetas = testData[[1]], 
-                                          modelList = list(Predicted = HousemanBlood150CpGModel), 
+                                          modelList = list(Predicted = HousemanBlood50CpGModel), 
                                           trueComparison = T,
                                           noise = T,
                                           trueProportions = testData[[2]],
@@ -574,7 +575,7 @@ source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 
 ## load model
-load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
 
 ## load testing data
 load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
@@ -584,7 +585,7 @@ meanBloodProp = matrix(nrow = 1, byrow = T, data = c(3.01,13.4, 6.13, 64.9, 5.4,
 colnames(meanBloodProp) = levels(phenoTest$celltype)
 
 ## create a single representative sample
-testData = CellTypeProportionSimulator(betas = GetModelCG(betasTest, list(HousemanBlood150CpGModel)), 
+testData = CellTypeProportionSimulator(betas = GetModelCG(betasTest, list(HousemanBlood50CpGModel)), 
                                        pheno = phenoTest, 
                                        phenoColName = "celltype", 
                                        nBulk = 1, 
@@ -604,7 +605,7 @@ MakeNAsInBetas = function(proportionNA, betas){
 propMissing = seq(0,0.9,0.05)
 x = lapply(propMissing, MakeNAsInBetas, testData[[1]])
 
-plotDat = ErrorAcrossDataSets(x, HousemanBlood150CpGModel)
+plotDat = ErrorAcrossDataSets(x, HousemanBlood50CpGModel)
 plotDat = cbind.data.frame(plotDat, propMissing = seq(0,0.9,0.05))
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithMissingCpGs.pdf", height = 4, width = 7) 
@@ -618,8 +619,8 @@ dev.off()
 
 ### Check effect of age, sex in EXTEND and US #########
 ## load model
-load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
-model =  HousemanBlood150CpGModel
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+model =  HousemanBlood50CpGModel
 
 ## load functions
 source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
@@ -637,7 +638,7 @@ usPheno = pheno
 load("/mnt/data1/EXTEND/Methylation/QC/EXTEND_batch1_2_merged/EXTEND_batches_1_2_normalised_together.rdat")
 ex = betas
 exPheno = pheno
-rm(dat, betas, pheno, HousemanBlood150CpGModel)
+rm(dat, betas, pheno, HousemanBlood50CpGModel)
 
 ## get error for US
 usPred = projectCellTypeWithError(us, modelType = "ownModel", ownModelData = model)
@@ -672,6 +673,78 @@ t.test(allPheno[allPheno$sex == "Female","error"], allPheno[allPheno$sex == "Mal
 summary(lm(error ~ ageDiff, data = allPheno))
 
 
+### check annotation of model CpGs to chromosomes #####
+x = read.csv("/mnt/data1/EPIC_reference/MethylationEPIC_v-1-0_B4.csv", skip = 7, header = T)
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+
+x = x[,c("IlmnID", "CHR")]
+cpgInMod = x[x$IlmnID %in% rownames(HousemanBlood50CpGModel$coefEsts),]
+table(cpgInMod$CHR)
+
+save(cpgInMod, file = "/mnt/data1/Thea/ErrorMetric/data/cpgInModel.Rdata")
+
+### compare X chromosome in model between male and female in EX and US ####
+load("/mnt/data1/Thea/ErrorMetric/data/cpgInModel.Rdata")
+load("/mnt/data1/EPICQC/UnderstandingSociety/US_Betas_Pheno.rda")
+us = dat
+usPheno = pheno
+load("/mnt/data1/EXTEND/Methylation/QC/EXTEND_batch1_2_merged/EXTEND_batches_1_2_normalised_together.rdat")
+ex = betas
+exPheno = pheno
+rm(dat, betas, pheno)
+
+exT = ex[rownames(ex) %in% cpgInMod$IlmnID,]
+usT = us[rownames(us) %in% cpgInMod$IlmnID,]
+
+exT = exT[match(cpgInMod$IlmnID, rownames(exT)),]
+usT = usT[match(cpgInMod$IlmnID, rownames(usT)),]
+
+all(rownames(exT) == cpgInMod$IlmnID)
+all(rownames(usT) == cpgInMod$IlmnID)
+
+## subset for those in the x chromosome
+exT = exT[cpgInMod$CHR == "X",]
+usT = usT[cpgInMod$CHR == "X",]
+
+sexUS = usPheno$nsex
+sexUS = ifelse(sexUS =="1", "Male", "Female")
+
+plotDat = rbind.data.frame(data.frame(t(exT), sampleID = colnames(exT), study = "EX", sex = exPheno$Sex),
+                           data.frame(t(usT), sampleID = colnames(usT), study = "US", sex = sexUS))
+
+statDat = data.frame(matrix(nrow = ncol(plotDat)-3, ncol = 5))
+colnames(statDat) = c("CpG", "pValue", "Sig", "meanF", "meanM")
+for (i in 1:(ncol(plotDat)-3)){
+  x = t.test(plotDat[,i]~plotDat[,"sex"])
+  statDat[i,1] = colnames(plotDat)[i]
+  statDat[i,2] = signif(x$p.value, 2)
+  statDat[i,4:5] = signif(x$estimate, 3)
+}
+statDat$Sig[statDat$pValue >= 0.05] = ""
+statDat$Sig[statDat$pValue < 0.05] = "."
+statDat$Sig[statDat$pValue < 0.01] = "*"
+statDat$Sig[statDat$pValue < 0.001] = "**"
+statDat$Sig[statDat$pValue < 0.0001] = "***"
+
+
+library(xtable)
+print(xtable(statDat), include.rownames=FALSE)
+
+library(reshape2)
+plotDat = melt(plotDat, id.vars = c("study", "sex", "sampleID"))
+
+library(ggplot2)
+library(cowplot)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/ErrorXchrCpGsInEXUS.pdf", height = 8, width = 14)
+ggplot(plotDat, aes(x = variable, y = value, fill = sex)) +
+  theme_cowplot(18) +
+  geom_violin(position=position_dodge(0.5)) +
+  facet_wrap(~study, ncol = 1) +
+  labs(y = "Proportion of methylation", fill = "Sex", x = "X chromosome CpGs") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 15))
+dev.off()
+
 
 
 
@@ -687,8 +760,8 @@ dat = cbind.data.frame(read.gdsn(index.gdsn(gfile$root, "Pred")),
                        SubTissue = read.gdsn(index.gdsn(gfile$root, "SubTissue")),
                        Sample = read.gdsn(index.gdsn(gfile$root, "colnames")),
                        DatasetOrigin = read.gdsn(index.gdsn(gfile$root, "DatasetOrigin")))
-load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
-colnames(dat)[1:8] = c(colnames(HousemanBlood150CpGModel$coefEsts), "error", "nCGmissing")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+colnames(dat)[1:8] = c(colnames(HousemanBlood50CpGModel$coefEsts), "error", "nCGmissing")
 
 ## remove the .gds from DatasetOrigin
 dat$DatasetOrigin = as.factor(unlist(strsplit(as.character(dat$DatasetOrigin), ".g"))[seq(1,nrow(dat)*2,2)])
@@ -892,9 +965,9 @@ betas = betas[,colnames(betas) %in% pheno$Basename]
 
 ## Use model to predict cell types
 source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
-load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
 
-pred = projectCellTypeWithError(betas, modelType = "ownModel", ownModelData = HousemanBlood150CpGModel)
+pred = projectCellTypeWithError(betas, modelType = "ownModel", ownModelData = HousemanBlood50CpGModel)
 
 ## summarise data for plotting
 predNames =  c("CD4T", "CD8T", "Bcell", "Gran", "Mono")
@@ -942,145 +1015,3 @@ ggplot(plotDat, aes(x = cellP, y = error, col = Celltype, shape = Celltype)) +
 dev.off()
 
 
-
-### check annotation of model CpGs to chromosomes #####
-x = read.csv("/mnt/data1/EPIC_reference/MethylationEPIC_v-1-0_B4.csv", skip = 7, header = T)
-load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel150CpG.Rdata")
-
-x = x[,c("IlmnID", "CHR")]
-cpgInMod = x[x$IlmnID %in% rownames(HousemanBlood150CpGModel$coefEsts),]
-table(cpgInMod$CHR)
-
-save(cpgInMod, file = "/mnt/data1/Thea/ErrorMetric/data/cpgInModel.Rdata")
-
-### compare X chromosome in model between male and female in EX and US ####
-load("/mnt/data1/Thea/ErrorMetric/data/cpgInModel.Rdata")
-load("/mnt/data1/EPICQC/UnderstandingSociety/US_Betas_Pheno.rda")
-us = dat
-usPheno = pheno
-load("/mnt/data1/EXTEND/Methylation/QC/EXTEND_batch1_2_merged/EXTEND_batches_1_2_normalised_together.rdat")
-ex = betas
-exPheno = pheno
-rm(dat, betas, pheno)
-
-exT = ex[rownames(ex) %in% cpgInMod$IlmnID,]
-usT = us[rownames(us) %in% cpgInMod$IlmnID,]
-
-exT = exT[match(cpgInMod$IlmnID, rownames(exT)),]
-usT = usT[match(cpgInMod$IlmnID, rownames(usT)),]
-
-all(rownames(exT) == cpgInMod$IlmnID)
-all(rownames(usT) == cpgInMod$IlmnID)
-
-## subset for those in the x chromosome
-exT = exT[cpgInMod$CHR == "X",]
-usT = usT[cpgInMod$CHR == "X",]
-
-sexUS = usPheno$nsex
-sexUS = ifelse(sexUS =="1", "Male", "Female")
-
-plotDat = rbind.data.frame(data.frame(t(exT), sampleID = colnames(exT), study = "EX", sex = exPheno$Sex),
-                           data.frame(t(usT), sampleID = colnames(usT), study = "US", sex = sexUS))
-
-statDat = data.frame(matrix(nrow = ncol(plotDat)-3, ncol = 5))
-colnames(statDat) = c("CpG", "pValue", "Sig", "meanF", "meanM")
-for (i in 1:(ncol(plotDat)-3)){
-  x = t.test(plotDat[,i]~plotDat[,"sex"])
-  statDat[i,1] = colnames(plotDat)[i]
-  statDat[i,2] = signif(x$p.value, 2)
-  statDat[i,4:5] = signif(x$estimate, 3)
-}
-statDat$Sig[statDat$pValue >= 0.05] = ""
-statDat$Sig[statDat$pValue < 0.05] = "."
-statDat$Sig[statDat$pValue < 0.01] = "*"
-statDat$Sig[statDat$pValue < 0.001] = "**"
-statDat$Sig[statDat$pValue < 0.0001] = "***"
-
-
-library(xtable)
-print(xtable(statDat), include.rownames=FALSE)
-
-library(reshape2)
-plotDat = melt(plotDat, id.vars = c("study", "sex", "sampleID"))
-
-library(ggplot2)
-library(cowplot)
-
-pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/ErrorXchrCpGsInEXUS.pdf", height = 8, width = 14)
-ggplot(plotDat, aes(x = variable, y = value, fill = sex)) +
-  theme_cowplot(18) +
-  geom_violin(position=position_dodge(0.5)) +
-  facet_wrap(~study, ncol = 1) +
-  labs(y = "Proportion of methylation", fill = "Sex", x = "X chromosome CpGs") +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 15))
-dev.off()
-
-
-### Test number of model CpGs needed for DSRMSE to still work ####
-load("/mnt/data1/Thea/ErrorMetric/data/nCpGModels/nCpGModels.Rdata")
-
-nCG = c()
-for(i in 1:length(modelListCpG)){
-  nCG = c(nCG, nrow(modelListCpG[[i]]$coefEsts))
-}
-
-## mean proportions of each cell type in whole blood (from Reinius2012)
-meanBloodProp = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43)
-sdBloodProp = c(1.44, 3.12, 3.13, 9.19, 3.17, 1.5)
-
-source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
-source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
-
-## load data
-load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
-
-## each cell type will be simulated with mean, mean +- sd, mean +- 2sd
-
-bulk = CellTypeProportionSimulator(GetModelCG(betasTest, modelListCpG),
-                            phenoTest,
-                            phenoColName = "celltype",
-                            nBulk = 30,
-                            proportionsMatrixType = "own",
-                            proportionsMatrix = simPropMaker(meanBloodProp, sdBloodProp))
-
-## add rnorm with varying sd to the sim then predict and plot
-createBulkWGaussian = function(sdIN, bulkBetas){
-  x = apply(bulkBetas, 2, function(y){
-    y = y + rnorm(length(y), 0, sdIN)
-    y[y>1] = 1
-    y[y<0] = 0
-    return(y)
-  })
-  return(x)
-}
-
-sdUsed = c(0.5,0.25, 0)
-
-bulkWError = lapply(sdUsed, createBulkWGaussian, bulk[[1]])
-bulkWError = do.call("cbind", bulkWError)
-
-bulkWErrorPheno = cbind(do.call(rbind, replicate(length(sdUsed), bulk[[2]], simplify=FALSE)), rep(sdUsed, each = nrow(bulk[[2]])))
-colnames(bulkWErrorPheno) = c("Bcell.t", "CD4T.t", "CD8T.t", "Gran.t", "Mono.t", "NK.t", "SD")
-
-
-predWithGaussian = lapply(names(modelListCpG), function(x){projectCellTypeWithError(YIN = bulkWError,
-                                           modelType = "ownModel",
-                                           ownModelData = modelListCpG[[x]])})
-
-predWithGaussian = cbind(do.call("rbind", predWithGaussian), rep(nCG, each = (length(sdUsed)*nrow(bulk[[2]]))))
-colnames(predWithGaussian)[9] = "nModelCG"
-
-plotDat = cbind.data.frame(do.call(rbind, replicate(length(modelListCpG), bulkWErrorPheno, simplify=FALSE)),
-                           predWithGaussian)
-
-library(ggplot2)
-library(cowplot)
-
-pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/nCpGwithDSRMSE.pdf", height = 7, width = 11)
-ggplot(plotDat, aes(x = as.factor(nModelCG), y = error, fill = as.factor(SD))) +
-  geom_boxplot()+
-  theme_cowplot(18) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-  labs(x = "CpGs in model", y = "DSRMSE", fill = "Noise\nSD")
-dev.off()
