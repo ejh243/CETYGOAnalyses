@@ -939,6 +939,8 @@ datB$Tissue = as.character(datB$Tissue)
 datB$Tissue[datB$Tissue == "Granulocyes"] = "Granulocytes"
 datB$Tissue = as.factor(as.character(datB$Tissue))
 
+save(datB, file = "/mnt/data1/Thea/ErrorMetric/data/bloodPurifiedPredictedFromEssex.Rdata")
+
 ##  plot a grid of one cell type at a time
 plot = list()
 for (i in 1:4){
@@ -1014,11 +1016,10 @@ datBad[datBad$DatasetOrigin == "GSE89251" & datBad$trueProp < 0.5,"Sample"]
 datB[datB$DatasetOrigin == "GSE89251" & datB$error > 0.2,"Sample"]
 
 
+
 ### comparison to estimateCellCounts.wmln #############
-# library(gdsfmt)
-# x = openfn.gds("/storage/st05d/deepmelon/GEOClod.gds", readonly=TRUE, allow.duplicate=FALSE, allow.fork=FALSE)
-# 
-# ### comparison to estimateCellCounts.wmln #############
+
+#### Exxex server code
 # library(gdsfmt)
 # x = openfn.gds("/storage/st05d/deepmelon/GEOClod.gds", readonly=TRUE, allow.duplicate=FALSE, allow.fork=FALSE)
 # 
@@ -1032,34 +1033,163 @@ datB[datB$DatasetOrigin == "GSE89251" & datB$error > 0.2,"Sample"]
 # 
 # setwd("~/gdsTemp/")
 # 
-# pDataVal = c("B Cells", "Granulocyes", "NK", "T Cells")
-# newGdsName = "gsub"
-# pDataSplit = "Tissue"
-# gfileOld = x
-# 
+# # pDataVal = c("B Cells", "Granulocyes", "NK", "T Cells")
+# # newGdsName = "gsub"
+# # pDataSplit = "Tissue"
+# # gfileOld = x
 # 
 # createSubGDS = function(pDataVal, newGdsName, pDataSplit, gfileOld){
-#   gfile = createfn.gds(newGdsName)
+#   tempgfile = createfn.gds(newGdsName)
 #   
 #   ## add fData
-#   add.gdsn(gfile, "fData", fData(x))
+#   add.gdsn(tempgfile, "fData", fData(gfileOld))
 #   
 #   ## get index for col/rows to keep
-#   pCol = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), pDataSplit))
+#   pCol = read.gdsn(index.gdsn(index.gdsn(gfileOld$root, "pData"), pDataSplit))
 #   index = which(pCol %in% pDataVal)
 #   
 #   ## add subset pData
-#   add.gdsn(gfile, "pData", pData(x)[index,])
+#   add.gdsn(tempgfile, "pData", pData(gfileOld)[index,])
 #   
 #   ## add the rest of the data, subset
-#   add.gdsn(gfile, "rawbetas", read.gdsn(index.gdsn(x, "rawbetas"))[,index])
-#   add.gdsn(gfile, "methylated", read.gdsn(index.gdsn(x, "methylated"))[,index])
-#   add.gdsn(gfile, "unmethylated", read.gdsn(index.gdsn(x, "unmethylated"))[,index])
-#   add.gdsn(gfile, "pvals", read.gdsn(index.gdsn(x, "pvals"))[,index])
-#   add.gdsn(gfile, "NBeads", read.gdsn(index.gdsn(x, "NBeads"))[,index])
+#   add.gdsn(tempgfile, "betas", read.gdsn(index.gdsn(gfileOld, "rawbetas"))[,index])
+#   add.gdsn(tempgfile, "methylated", read.gdsn(index.gdsn(gfileOld, "methylated"))[,index])
+#   add.gdsn(tempgfile, "unmethylated", read.gdsn(index.gdsn(gfileOld, "unmethylated"))[,index])
+#   add.gdsn(tempgfile, "pvals", read.gdsn(index.gdsn(gfileOld, "pvals"))[,index])
+#   add.gdsn(tempgfile, "NBeads", read.gdsn(index.gdsn(gfileOld, "NBeads"))[,index])
+#   add.gdsn(tempgfile, "paths", read.gdsn(index.gdsn(gfileOld, "paths")))
 #   
-#   return(gfile)
+#   return(tempgfile)
 # }
+# 
+# # gfile = createSubGDS(pDataVal = c("B Cells", "Granulocyes", "NK", "T Cells"),
+# #                    newGdsName = "gsub",
+# #                    pDataSplit = "Tissue",
+# #                    gfileOld = x)
+# # closefn.gds(gfile)
+# # gfile = openfn.gds("gsub", readonly = F)
+# 
+# ## get prediction per study
+# library(gdsfmt)
+# library(wateRmelon)
+# library(bigmelon)
+# setwd("~/gdsTemp/")
+# gfile = openfn.gds("gsub")
+# 
+# gds2mlumi <- function(gds, i, j){
+#   history.submitted = as.character(Sys.time())
+#   x <- gds
+#   if("NBeads"%in%ls.gdsn(x)){
+#     aDat <- assayDataNew(
+#       betas = x[i, j, node = "betas",
+#                 name = TRUE, drop = FALSE],
+#       pvals = x[i, j, node = "pvals",
+#                 name = TRUE, drop = FALSE],
+#       NBeads = x[i, j, node = "NBeads", 
+#                  name = TRUE, drop = FALSE],
+#       methylated = x[i, j, node = "methylated", 
+#                      name = TRUE, drop = FALSE],
+#       unmethylated = x[i, j, node = "unmethylated", 
+#                        name = TRUE, drop = FALSE])
+#   } else {
+#     aDat <- assayDataNew(
+#       betas = x[i, j, node = "betas",
+#                 name = TRUE, drop = FALSE],
+#       pvals = x[i, j, node = "pvals",
+#                 name = TRUE, drop = FALSE],
+#       methylated = x[i, j, node = "methylated",
+#                      name = TRUE, drop = FALSE],
+#       unmethylated = x[i, j, node = "unmethylated",
+#                        name = TRUE, drop = FALSE])
+#   }
+#   # Creating MethyLumiSet
+#   x.lumi = new("MethyLumiSet", assayData=aDat)
+#   pdat <- pData(x)
+#   rownames(pdat) <- colnames(x)
+#   pData(x.lumi) <- pdat[j, , drop = FALSE]
+#   fdat <- fData(x)
+#   rownames(fdat) <- rownames(x)
+#   fData(x.lumi) <- fdat[i, , drop = FALSE]
+#   if(length(grep("QC", ls.gdsn(x), ignore.case = TRUE))>1){
+#     qcm <- QCmethylated(x)
+#     qcu <- QCunmethylated(x)
+#     colnames(qcm) <- colnames(qcu) <- colnames(x)
+#     rownames(qcm) <- rownames(qcu) <- QCrownames(x)
+#     qc <- new("MethyLumiQC",
+#               assayData = assayDataNew(
+#                 methylated = qcm[ , j, drop = FALSE],
+#                 unmethylated = qcu[ , j, drop = FALSE])
+#     )
+#     x.lumi@QC <- qc
+#   }
+#   
+#   return(x.lumi)
+# }
+# 
+# GEOLevels = unique(pData(gfile)$DatasetOrigin)
+# 
+# predList = list()
+# for(i in 1:length(GEOLevels)){
+#   y = createSubGDS(pDataVal = GEOLevels[i],
+#                    newGdsName = GEOLevels[i], 
+#                    pDataSplit = "DatasetOrigin",
+#                    gfileOld = gfile)
+#   mSet = gds2mlumi(y)
+#   predList[[i]] = estimateCellCounts.wmln(mSet)
+# }
+# 
+# # tempList = predList
+# # predList = tempList
+# for (i in 1:length(predList)){
+#   predList[[i]] = cbind.data.frame(predList[[i]], GEOLevels[i])
+#   colnames(predList[[i]])[7] = "DatasetOrigin"
+# }
+# 
+# pred = do.call("rbind.data.frame", predList)
+# 
+# save(pred, file = "~/wateRmelonPredictedProportionsPurified.Rdata")
+
+### knight code
+load("/mnt/data1/Thea/ErrorMetric/data/EssexOutput/wateRmelonPredictedProportionsPurified.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/data/bloodPurifiedPredictedFromEssex.Rdata")
+
+datB = datB[,c("Bcell", "CD4T", "CD8T", "Gran", "Mono", "NK", "error", "Sample", "DatasetOrigin", "Tissue", "trueProp")]
+library(stringr)
+datB$Sample = str_sub(datB$Sample, 12, -1)
+
+pred$Sample = rownames(pred)
+pred$DatasetOrigin = str_sub(pred$DatasetOrigin, 1, -5)
+colnames(pred)[1:6] = paste(colnames(pred)[1:6],"WateR", sep = "_") 
+
+library(dplyr)
+Pred = inner_join(datB, pred, by = "Sample")
+
+Pred$truePropWateR = Pred$Gran_WateR
+Pred$truePropWateR[Pred$Tissue == "B Cells"] = Pred$Bcell_WateR[Pred$Tissue == "B Cells"]
+Pred$truePropWateR[Pred$Tissue == "NK"] = Pred$NK_WateR[Pred$Tissue == "NK"]
+Pred$truePropWateR[Pred$Tissue == "T Cells"] = Pred$CD4T_WateR[Pred$Tissue == "T Cells"] +
+                                                Pred$CD8T_WateR[Pred$Tissue == "T Cells"]
+
+
+library(ggplot2)
+library(cowplot)
+library(viridis)
+library(plyr)
+
+Pred$Tissue = revalue(Pred$Tissue, c("B Cells" = "Bcell",
+                       "Granulocytes" = "Gran",
+                       "T Cells" = "Tcell" ))
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/MinfiVSMyPredForValidation.pdf", height = 7, width = 8)
+ggplot(Pred, aes(x = trueProp, y = truePropWateR, shape = Tissue, col = error)) +
+  geom_point(size = 2) +
+  theme_cowplot(18) +
+  scale_color_viridis() +
+  scale_shape_manual(values = c(20, 3, 8, 18)) +
+  labs(x = "Predictions from unnormalised model\n(Proportion of annotated cell type)",
+       y = "Predictions from wateRmelon model\n(Proportion of annotated cell type)", 
+       col = "DSRMSE", shape = "Cell type")
+dev.off()
 
 
 
