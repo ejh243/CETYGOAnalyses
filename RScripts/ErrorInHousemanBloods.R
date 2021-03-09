@@ -1266,3 +1266,48 @@ ggplot(plotDat, aes(x = cellP, y = error, col = Celltype, shape = Celltype)) +
 dev.off()
 
 
+
+### heatmaps for diagram ##############################
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+
+## load functions
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+
+## subset to include only 3 celltypes
+betasTrain = betasTrain[,which(phenoTrain$celltype %in% c("Bcell", "Mono", "CD8T"))]
+phenoTrain = phenoTrain[which(phenoTrain$celltype %in% c("Bcell", "Mono", "CD8T")),]
+
+## make model with  5 CpGs, make heatmap for each cell type and their equal sum
+model = pickCompProbes(rawbetas = betasTrain,
+                       cellTypes = levels(as.factor(as.character(phenoTrain$celltype))),
+                       cellInd = as.factor(as.character(phenoTrain$celltype)),
+                       numProbes =  5,
+                       probeSelect = "auto")
+
+
+library(gplots)
+library(scales)
+library(ComplexHeatmap)
+
+col = list(Celltype = c("Bcell" = "#F8766D", #"CD4T" = "#B79F00",
+                        "CD8T" = "#00BA38",  #"Gran" = "#00BFC4",
+                        "Mono" = "#619CFF"#,  "NK" = "#F564E3"
+                        ))
+
+ha <- HeatmapAnnotation(Celltype = phenoTrain$celltype,
+                        col = col)
+
+Heatmap(model$coefEst, name = "DNAm",
+        top_annotation = ha, show_row_names = F, show_column_names = F, show_row_dend = F, cluster_rows = F, cluster_columns = F)
+
+Heatmap(rowSums(model$coefEst)/3, cluster_rows = F, cluster_columns = F)
+
+Heatmap(apply(model$coefEst,1, function(x){x[1]*0.8 +
+                                        x[2]*0.1 +
+                                        x[3]*0.1 }), cluster_rows = F, cluster_columns = F)
+
+
+Heatmap(apply(model$coefEst,1, function(x){x[1]*0.2 +
+    x[2]*0.4 +
+    x[3]*0.4}), cluster_rows = F, cluster_columns = F)
