@@ -217,7 +217,7 @@ ggplot(plotDat, aes(x = norm, y = diff)) +
   geom_violin() +
   geom_jitter(aes(col = cell, shape = cell)) +
   theme_cowplot(18) +
-  labs(x = "Normalisation", y = "Absolute difference between\ntrue and predicted\n(Proportion of methylation)") +
+  labs(x = "Normalisation", y = "Absolute difference between true and\npredicted cell type proportions") +
   theme(legend.title = element_blank())
 dev.off()
 
@@ -278,7 +278,7 @@ ggplot(corPlot, aes(x = cpg, y = rmseTvP)) +
   geom_point() +
   theme_cowplot(18) +
   labs(x = expression(paste(italic("numProbes"))), 
-                      y = "Absolute difference between\ntrue and predicted\n(Proportion of methylation)")
+                      y = "Absolute difference between true and\npredicted cell type proportions")
 dev.off()
 
 ## save model that used 150 CpGs
@@ -776,9 +776,9 @@ dev.off()
 # sDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "Sex"))
 # dDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "DatasetOrigin"))
 # stDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "SubTissue"))
-# tInd = which(tDat == "" | 
-#                tDat == "Unsorted Tissues" | 
-#                tDat == "Unsorted Cell Line" | 
+# tInd = which(tDat == "" |
+#                tDat == "Unsorted Tissues" |
+#                tDat == "Unsorted Cell Line" |
 #                tDat == "Unsorted Tumours")
 # 
 # betaMod = betaMod[,-tInd]
