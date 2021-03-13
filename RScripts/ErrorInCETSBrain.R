@@ -40,44 +40,47 @@ save(colOrdeByCell, file = "/mnt/data1/Thea/humanDeconvolution/data/CETScols.Rda
 
 save(betasCETS, phenoCETS, file = "/mnt/data1/Thea/humanDeconvolution/data/CETSUnnormalised.RData")
 
-load("/mnt/data1/Thea/humanDeconvolution/data/CETSUnnormalised.RData")
-## subset to NeuN+ to have individuals not samples
-temp = phenoCETS[phenoCETS$Celltype == "NeuN+",]
-tempA = temp[temp$Ethnicity == "African",]
-
-## randomly select 2 African samples
-set.seed(1234)
-ATest = tempA$Individual[sample(nrow(tempA), 4)]
-
-## randomly select 7 Caucasian samples
-temp = temp[temp$Ethnicity == "Caucasian",]
-set.seed(1234)
-CTest = temp$Individual[sample(nrow(temp), 16)]
-
-phenoCETS$TrainTestnNeeded = "Train"
-phenoCETS$TrainTestnNeeded[phenoCETS$Individual %in% c(as.numeric(as.character(ATest)), as.numeric(as.character(CTest)))] = "Test"
-
-betasCETSTest = betasCETS[,phenoCETS$TrainTestnNeeded == "Test"]
-phenoCETSTest = phenoCETS[phenoCETS$TrainTestnNeeded == "Test",]
-
-betasCETSTrain = betasCETS[,phenoCETS$TrainTestnNeeded == "Train"]
-phenoCETSTrain = phenoCETS[phenoCETS$TrainTestnNeeded == "Train",]
-
-save(betasCETSTest, phenoCETSTest,betasCETSTrain,phenoCETSTrain,
-     file = "/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
-
-
-### create model using test data ######################
-load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
-source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
-
-CETSmodel = pickCompProbes(rawbetas = betasCETSTrain,
-                           cellTypes = levels(as.factor(as.character(phenoCETSTrain$Celltype))),
-                           cellInd = as.factor(as.character(phenoCETSTrain$Celltype)),
-                           numProbes = 50,
-                           probeSelect = "auto")
-
-save(CETSmodel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
+# load("/mnt/data1/Thea/humanDeconvolution/data/CETSUnnormalised.RData")
+# 
+# ## n needed in test
+# length(levels(phenoCETS$Individual))*.5 # 14
+# 
+# ## subset to NeuN+ to have individuals not samples
+# temp = phenoCETS[phenoCETS$Celltype == "NeuN+",]
+# tempA = temp[temp$Ethnicity == "African",]
+# 
+# ## randomly select 2 African samples
+# set.seed(1234)
+# ATest = tempA$Individual[sample(nrow(tempA), 3)]
+# 
+# ## randomly select 7 Caucasian samples
+# temp = temp[temp$Ethnicity == "Caucasian",]
+# set.seed(1234)
+# CTest = temp$Individual[sample(nrow(temp), 11)]
+# 
+# phenoCETS$TrainTestnNeeded = "Train"
+# phenoCETS$TrainTestnNeeded[phenoCETS$Individual %in% c(as.numeric(as.character(ATest)), as.numeric(as.character(CTest)))] = "Test"
+# 
+# betasCETSTest = betasCETS[,phenoCETS$TrainTestnNeeded == "Test"]
+# phenoCETSTest = phenoCETS[phenoCETS$TrainTestnNeeded == "Test",]
+# 
+# betasCETSTrain = betasCETS[,phenoCETS$TrainTestnNeeded == "Train"]
+# phenoCETSTrain = phenoCETS[phenoCETS$TrainTestnNeeded == "Train",]
+# 
+# save(betasCETSTest, phenoCETSTest,betasCETSTrain,phenoCETSTrain,
+#      file = "/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
+# 
+# ### create model using test data ######################
+# load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
+# source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+# 
+# CETSmodel = pickCompProbes(rawbetas = betasCETSTrain,
+#                            cellTypes = levels(as.factor(as.character(phenoCETSTrain$Celltype))),
+#                            cellInd = as.factor(as.character(phenoCETSTrain$Celltype)),
+#                            numProbes = 50,
+#                            probeSelect = "auto")
+# 
+# save(CETSmodel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
 
 ### compare error with noise ##########################
 load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
@@ -108,9 +111,9 @@ stackedWithNoise = ModelCompareStackedBar(testBetas = testData[[1]],
                                           nCpGPlot = F,
                                           sampleNamesOnPlots = F)
 
-stackedWithNoise[[1]]
-stackedWithNoise[[2]] + scale_fill_manual(values = c("#714a91", "#4ab9b0"))
-stackedWithNoise[[3]] + scale_fill_manual(values = c("#714a91", "#4ab9b0", "#555353"))
+# stackedWithNoise[[1]]
+# stackedWithNoise[[2]] + scale_fill_manual(values = c("#714a91", "#4ab9b0"))
+# stackedWithNoise[[3]] + scale_fill_manual(values = c("#714a91", "#4ab9b0", "#555353"))
 
 leg = get_legend(stackedWithNoise[[3]] + scale_fill_manual(values = c("#714a91", "#4ab9b0", "#555353"))
                  + theme(legend.position=c(0.3,0.8),legend.direction = "horizontal", legend.title = element_blank())
@@ -153,6 +156,8 @@ dev.off()
 # library(bigmelon)
 # pData = pData(x)
 # 
+# tDat = pData$Tissue
+# 
 # tInd = which(tDat == "" |
 #                tDat == "Unsorted Tissues" |
 #                tDat == "Unsorted Cell Line" |
@@ -183,7 +188,7 @@ dev.off()
 #   pred = projectCellTypeWithError(betaMod[,(ind - 999):ind], model = "ownModel", ownModelData = model)
 #   return(pred)})
 # 
-# errPred[[length(errPred)+1]] = projectCellTypeWithError(betaMod[,19001:19129], model = "ownModel", ownModelData = model)
+# errPred[[length(errPred)+1]] = projectCellTypeWithError(betaMod[,19001:19131], model = "ownModel", ownModelData = model)
 # 
 # ## extract all from list and add to gds file
 # pred = do.call("rbind", errPred)
@@ -241,7 +246,7 @@ ggplot(dat, aes(x = fct_reorder(TissueBrain, brain, .fun = median, .desc =TRUE))
   theme_cowplot(18) +
   scale_fill_manual(values = c("#0A8ABA", "#BA3A0A"), name = "Brain?", labels = c("No", "Yes")) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-  labs(x = element_blank(), y = "DSRMSE") +
+  labs(x = element_blank(), y = "CETYGO") +
   geom_text(data = dat.pos, aes(TissueBrain, label = n, y = pos+0.02))
 dev.off()
 
@@ -253,7 +258,7 @@ t.test(dat$error[dat$brain ==0], dat$error[dat$brain ==1])
 ### apply to CETS test and external data for benchmark ####
 library(GEOquery)
 untar(tarfile="GSE112179/GSE112179_RAW.tar", exdir="GSE112179/IDATs")
-setwd("GSE112179/IDATs")
+setwd("/mnt/data1/Thea/ErrorMetric/data/externalData/GSE112179/IDATs")
 sapply(list.files(), gunzip)
 
 GSE112179 = getGEO(filename = "../GSE112179_series_matrix.txt.gz")

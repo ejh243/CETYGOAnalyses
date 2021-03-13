@@ -254,7 +254,7 @@ PredictionErrorAndResiduals = function(model, testBetas, testPheno){
           geom_point(size = 2) +
           theme_cowplot(18) +
           ylim(c(0,max(plotDat$error)))+
-          labs(x = "|Actual - Predicted|", y = "DSRMSE", shape = "Cell type", col = "Cell type"))
+          labs(x = "|Actual - Predicted|", y = "CETYGO", shape = "Cell type", col = "Cell type"))
 }
 
 
@@ -374,7 +374,7 @@ ModelCompareStackedBar = function(testBetas,
       geom_point() +
       theme_cowplot(18) +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      labs(x = "Sample", y = "DSRMSE") +
+      labs(x = "Sample", y = "CETYGO") +
       ylim(c(0, max(predictions$error)))
   }else{plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
     geom_point() +
@@ -382,7 +382,7 @@ ModelCompareStackedBar = function(testBetas,
     theme(axis.title.x=element_blank(),
           axis.text.x=element_blank(),
           axis.ticks.x=element_blank()) +
-    labs(x = "Sample", y = "DSRMSE") +
+    labs(x = "Sample", y = "CETYGO") +
     ylim(c(0, max(predictions$error)))
   }
   
@@ -527,7 +527,7 @@ cellTypeCompareStackedBar = function(predictions){
       theme(axis.title.x=element_blank(),
             axis.text.x=element_blank(),
             axis.ticks.x=element_blank()) +
-      labs(x = "Sample", y = "DSRMSE") +
+      labs(x = "Sample", y = "CETYGO") +
       ggtitle(paste(cellTypeName, "-", levels(predictions$DatasetOrigin)[i])) +
                 ylim(c(0, max(predictions$error)))
               

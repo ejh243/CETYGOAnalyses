@@ -84,13 +84,10 @@ quantileBetas = getBeta(preprocessQuantile(betas, fixOutliers = TRUE,
                                            removeBadSamples = TRUE, badSampleCutoff = 10.5,
                                            quantileNormalize = TRUE, stratified = TRUE, 
                                            mergeManifest = FALSE, sex = NULL))
-
-
-
-
 ## save data
 save(quantileBetasTrain, quantileBetasTest, quantileBetas, phenoTest, phenoTrain, pheno,
      file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
+
 
 ### plot PCA of betas per cell type coloured by train test ######
 load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
@@ -415,7 +412,7 @@ pdf("/mnt/data1/Thea/ErrorMetric/plots/badModels/violinnCelltypeModels.pdf", hei
 ggplot(plotDatBox, aes(x = as.factor(sums), y = error, fill = as.factor(sums))) +
   geom_violin() +
   theme_cowplot(18) +
-  labs(x = "Number of cell types in the model", y = "DSRMSE") +
+  labs(x = "Number of cell types in the model", y = "CETYGO") +
   ylim(c(0, max(plotDatBox$error))) +
   theme(legend.position = "none") 
 dev.off() 
@@ -435,7 +432,7 @@ pdf("/mnt/data1/Thea/ErrorMetric/plots/badModels/violin5CelltypeModels.pdf", hei
 ggplot(plotDat5, aes(x = mod, y = error, fill = mod)) +
   geom_violin() +
   theme_cowplot(18) +
-  labs(x = "Model", y = "DSRMSE") +
+  labs(x = "Model", y = "CETYGO") +
   ylim(c(0, max(plotDat5$error))) +
   scale_x_discrete(limits = c("C4C8GMNK", "BC8GMNK", "BC4GMNK", "BC4C8MNK", "BC4C8GNK", "BC4C8GM")) +
   theme(legend.position = "none", 
@@ -508,7 +505,7 @@ ggplot(erPlotDat, aes(x = sample, y = error, col = model)) +
                               "Sh" = "0.8",
                               "Si" = "0.9",
                               "Sj" = "1.0")) +
-  labs(x = "Proportion of missing cell type", y = "DSRMSE", col = "Model") +
+  labs(x = "Proportion of missing cell type", y = "CETYGO", col = "Model") +
   ylim(c(0, max(erPlotDat$error)))
 dev.off()
 
@@ -612,7 +609,7 @@ pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithMissingCpGs.pdf", height =
 ggplot(plotDat, aes(x = propMissing, y = error)) +
   geom_point() +
   theme_cowplot(18) +
-  labs(x = "Proportion of CpGs missing", y = "DSRMSE")
+  labs(x = "Proportion of CpGs missing", y = "CETYGO")
 dev.off()
 
 
@@ -655,7 +652,7 @@ pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/sexAcrossEXandUS.pdf",
 ggplot(allPheno, aes(x = data, y = error, fill = sex)) +
   geom_violin() +
   theme_cowplot(18) +
-  labs(y = "DSRMSE", x = "Dataset", fill = "Sex")
+  labs(y = "CETYGO", x = "Dataset", fill = "Sex")
 dev.off()
 
 ## create age from 38 phenotype
@@ -665,7 +662,7 @@ pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/ageAcrossEXandUS.pdf",
 ggplot(allPheno, aes(x = ageDiff, y = error, col = data)) +
   geom_point() +
   theme_cowplot(18) +
-  labs(y = "DSRMSE", x = "Absolute age difference", col = "Dataset")
+  labs(y = "CETYGO", x = "Absolute age difference", col = "Dataset")
 dev.off()
 
 t.test(allPheno[allPheno$sex == "Female","error"], allPheno[allPheno$sex == "Male","error"], alternative = "greater")
@@ -887,7 +884,7 @@ ggplot(dat, aes(x = fct_reorder(TissueBlood, blood, .fun = median, .desc =TRUE))
   theme_cowplot(18) +
   scale_fill_manual(values = c("#0A8ABA", "#BA3A0A"), name = "Blood?", labels = c("No", "Yes")) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-  labs(x = element_blank(), y = "DSRMSE") +
+  labs(x = element_blank(), y = "CETYGO") +
   geom_text(data = dat.pos, aes(TissueBlood, label = n, y = pos+0.02))
 dev.off()
 
@@ -901,7 +898,7 @@ t.test(dat$error[dat$blood ==0], dat$error[dat$blood ==1])
 #   geom_boxplot() +
 #   theme_cowplot(18) +
 #   theme(legend.position = "none", axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.text.x.bottom = element_text(size=12)) +
-#   labs(x = "Study", y = "DSRMSE")
+#   labs(x = "Study", y = "CETYGO")
 # dev.off()
 # 
 # 
@@ -913,7 +910,7 @@ t.test(dat$error[dat$blood ==0], dat$error[dat$blood ==1])
 #   geom_boxplot() +
 #   theme_cowplot(18) +
 #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.text.x.bottom = element_text(size=12)) +
-#   labs(x = "Study", y = "DSRMSE", fill = "Sex")
+#   labs(x = "Study", y = "CETYGO", fill = "Sex")
 # dev.off()
 # 
 # pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodAgeCheck.pdf", height = 13, width = 9)
@@ -921,7 +918,7 @@ t.test(dat$error[dat$blood ==0], dat$error[dat$blood ==1])
 #   geom_point(size = 1.4) +
 #   theme_cowplot(18) +
 #   theme(legend.position = "bottom", legend.text = element_text(size=12)) +
-#   labs(x = "Age", y = "DSRMSE", col = "Study") 
+#   labs(x = "Age", y = "CETYGO", col = "Study") 
 # dev.off()
 
 ## select purified blood cell types
@@ -948,7 +945,7 @@ for (i in 1:4){
                      aes(x = trueProp, y = error, col = DatasetOrigin)) +
     geom_point(size = 2) +
     theme_cowplot(18) +
-    labs(x = "Predicted proportion", y = "DSRMSE", coll = "Data") +
+    labs(x = "Predicted proportion", y = "CETYGO", coll = "Data") +
     xlim(c(min(datB$trueProp),max(datB$trueProp))) +
     ylim(c(0, max(datB$error))) +
     ggtitle(levels(as.factor(as.character(datB$Tissue)))[i])
@@ -991,29 +988,29 @@ dev.off()
 
 
 
-## plot trueProp against 1-sum(predicted)
-datB$totalPred = rowSums(datB[,c("Bcell", "CD4T", "CD8T","Gran", "Mono","NK")])
-datB$absDiffPred = abs(rowSums(datB[,c("Bcell", "CD4T", "CD8T","Gran", "Mono","NK")])-1)
-
-
-ggplot(datB, aes(x = trueProp, y = absDiffPred, col = DatasetOrigin, shape = Tissue)) +
-  geom_point() +
-  theme_cowplot(18) +
-  labs(x = "True proportion", y = "|Sum of predictions - 1|")
-
-ggplot(datB, aes(x = trueProp, y = absDiffPred, col = error, shape = Tissue)) +
-  geom_point() +
-  theme_cowplot(18) +
-  labs(x = "True proportion", y = "|Sum of predictions - 1|")
-
-
-## doesn't show anything! Now look up the worst datasets in GEO in the hope that they're all cancer or something...
-datBad = datB[datB$error <0.1 & datB$trueProp<0.75,]
-levels(as.factor(as.character(datBad$DatasetOrigin)))
-
-## get sample IDs for samples in GSE89251 with low error, bad pred and those with higher error
-datBad[datBad$DatasetOrigin == "GSE89251" & datBad$trueProp < 0.5,"Sample"]
-datB[datB$DatasetOrigin == "GSE89251" & datB$error > 0.2,"Sample"]
+# ## plot trueProp against 1-sum(predicted)
+# datB$totalPred = rowSums(datB[,c("Bcell", "CD4T", "CD8T","Gran", "Mono","NK")])
+# datB$absDiffPred = abs(rowSums(datB[,c("Bcell", "CD4T", "CD8T","Gran", "Mono","NK")])-1)
+# 
+# 
+# ggplot(datB, aes(x = trueProp, y = absDiffPred, col = DatasetOrigin, shape = Tissue)) +
+#   geom_point() +
+#   theme_cowplot(18) +
+#   labs(x = "True proportion", y = "|Sum of predictions - 1|")
+# 
+# ggplot(datB, aes(x = trueProp, y = absDiffPred, col = error, shape = Tissue)) +
+#   geom_point() +
+#   theme_cowplot(18) +
+#   labs(x = "True proportion", y = "|Sum of predictions - 1|")
+# 
+# 
+# ## doesn't show anything! Now look up the worst datasets in GEO in the hope that they're all cancer or something...
+# datBad = datB[datB$error <0.1 & datB$trueProp<0.75,]
+# levels(as.factor(as.character(datBad$DatasetOrigin)))
+# 
+# ## get sample IDs for samples in GSE89251 with low error, bad pred and those with higher error
+# datBad[datBad$DatasetOrigin == "GSE89251" & datBad$trueProp < 0.5,"Sample"]
+# datB[datB$DatasetOrigin == "GSE89251" & datB$error > 0.2,"Sample"]
 
 
 
@@ -1188,7 +1185,7 @@ ggplot(Pred, aes(x = trueProp, y = truePropWateR, shape = Tissue, col = error)) 
   scale_shape_manual(values = c(20, 3, 8, 18)) +
   labs(x = "Predictions from unnormalised model\n(Proportion of annotated cell type)",
        y = "Predictions from wateRmelon model\n(Proportion of annotated cell type)", 
-       col = "DSRMSE", shape = "Cell type")
+       col = "CETYGO", shape = "Cell type")
 dev.off()
 
 
@@ -1261,7 +1258,7 @@ ggplot(plotDat, aes(x = cellP, y = error, col = Celltype, shape = Celltype)) +
   geom_smooth(method = "lm", se = FALSE) +
   theme_cowplot(18) +
   facet_wrap(~Celltype, nrow = 5, labeller = labeller(Celltype = labin)) +
-  labs(x = "Predicted proportion", y = "DSRMSE", col = "Cell type", shape = "Cell type") +
+  labs(x = "Predicted proportion", y = "CETYGO", col = "Cell type", shape = "Cell type") +
   theme(legend.position = "none")
 dev.off()
 
