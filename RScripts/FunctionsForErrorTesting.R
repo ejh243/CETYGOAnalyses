@@ -394,7 +394,7 @@ ModelCompareStackedBar = function(testBetas,
         theme_cowplot(18) +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
         labs(x = "Sample", y = "CGs missing") +
-        ylim(c(0, max(predictions$error)))
+        ylim(c(0, max(predictions$nCGmissing)))
     }else{
       plotList[[2]] = ggplot(predictions, aes(x = sample, y = nCGmissing, col = model)) +
         geom_point() +
@@ -403,7 +403,7 @@ ModelCompareStackedBar = function(testBetas,
               axis.text.x=element_blank(),
               axis.ticks.x=element_blank()) +
         labs(x = "Sample", y = "CGs missing") +
-        ylim(c(0, max(predictions$error)))
+        ylim(c(0, max(predictions$nCGmissing)))
     }
   }
   
