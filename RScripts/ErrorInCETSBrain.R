@@ -82,6 +82,28 @@ save(betasCETS, phenoCETS, file = "/mnt/data1/Thea/humanDeconvolution/data/CETSU
 # 
 # save(CETSmodel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
 
+### Compare sex application ###########################
+load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
+load("/mnt/data1/Thea/humanDeconvolution/data/cellTypeColours.Rdata")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+
+pred = as.data.frame(projectCellTypeWithError(betasCETSTest, modelType = "ownModel", ownModelData = CETSmodel))
+pred = cbind.data.frame(pred, phenoCETSTest)
+
+library(ggplot2)
+library(cowplot)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSSexViolin.pdf", height = 5, width = 5)
+ggplot(pred, aes(x = Sex, y = error, fill = Sex)) +
+  geom_violin() +
+  theme_cowplot(18) +
+  theme(legend.position = "none") +
+  labs(y = "Cetygo") 
+dev.off()
+
+t.test(pred$error[pred$Sex == "Female"], pred$error[pred$Sex != "Female"])
+
 ### compare error with noise ##########################
 load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
 load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
@@ -256,27 +278,28 @@ t.test(dat$error[dat$brain ==0], dat$error[dat$brain ==1])
 
 
 ### apply to CETS test and external data for benchmark ####
-library(GEOquery)
-untar(tarfile="GSE112179/GSE112179_RAW.tar", exdir="GSE112179/IDATs")
-setwd("/mnt/data1/Thea/ErrorMetric/data/externalData/GSE112179/IDATs")
-sapply(list.files(), gunzip)
+# library(GEOquery)
+# untar(tarfile="GSE112179/GSE112179_RAW.tar", exdir="GSE112179/IDATs")
+# setwd("/mnt/data1/Thea/ErrorMetric/data/externalData/GSE112179/IDATs")
+# sapply(list.files(), gunzip)
+# 
+# GSE112179 = getGEO(filename = "../GSE112179_series_matrix.txt.gz")
+# pheno = GSE112179@phenoData@data
+# pheno$Basename = substring(as.character(pheno$supplementary_file), 68, 97)
+# pheno = pheno[, c("age:ch1","cell.type:ch1","dist.dx:ch1",            
+#                   "pmi:ch1","race:ch1","sampleID:ch1","Sex:ch1","tissue:ch1",             
+#                   "tissuebank:ch1","tissuebank.id:ch1", "Basename")]
+# colnames(pheno) = c("age","cell.type","dist.dx",            
+#                     "pmi","race","sampleID","Sex","tissue",             
+#                     "tissuebank","tissuebank.id", "Basename")
+# save(pheno, file = "../phenoGSE112179.Rdata")
+# 
+# library(wateRmelon)
+# RGset <- read.metharray.exp(base = ".", targets = pheno)
+# save(RGset, file="/mnt/data1/Thea/ErrorMetric/data/externalData/GSE112179//GSE112179RGsetEPIC.Rdata")
 
-GSE112179 = getGEO(filename = "../GSE112179_series_matrix.txt.gz")
-pheno = GSE112179@phenoData@data
-pheno$Basename = substring(as.character(pheno$supplementary_file), 68, 97)
-pheno = pheno[, c("age:ch1","cell.type:ch1","dist.dx:ch1",            
-                  "pmi:ch1","race:ch1","sampleID:ch1","Sex:ch1","tissue:ch1",             
-                  "tissuebank:ch1","tissuebank.id:ch1", "Basename")]
-colnames(pheno) = c("age","cell.type","dist.dx",            
-                    "pmi","race","sampleID","Sex","tissue",             
-                    "tissuebank","tissuebank.id", "Basename")
-save(pheno, file = "../phenoGSE112179.Rdata")
 
-library(wateRmelon)
-RGset <- read.metharray.exp(base = ".", targets = pheno)
-save(RGset, file="../GSE112179RGsetEPIC.Rdata")
-
-load("../GSE112179RGsetEPIC.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/data/externalData/GSE112179//GSE112179RGsetEPIC.Rdata")
 library(minfi)
 betas = getBeta(RGset)
 
@@ -311,9 +334,12 @@ pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSERRORviolinPaiCets.pdf
 ggplot(plotDat, aes(x = dat, y = error, fill = dat)) +
   geom_violin() +
   theme_cowplot(18) +
+  scale_fill_manual(values = c("#c2c2c2", "white")) +
   theme(legend.position = "none") +
   labs(x = "Dataset", y = "DSRMSE")
 dev.off()
+
+x = t.test(plotDat$error[plotDat$dat == "PAI"],plotDat$error[plotDat$dat != "PAI"])
 
 pred$dist = abs(pred$`NeuN+`-1)
 pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/ERRORCETSabsdifVSerror.pdf")
@@ -324,13 +350,6 @@ ggplot(pred, aes(x = dist, y = error))+
 dev.off()
 
 cor(pred$dist, pred$error)
-
-
-
-
-
-
-
 
 
 
