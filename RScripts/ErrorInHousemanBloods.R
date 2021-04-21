@@ -104,9 +104,10 @@ for (i in 1:length(levels(pheno$celltype))){
   betaVar = apply(dat, 1, var, na.rm = T)
   topBeta = dat[order(betaVar, decreasing = T)[1:1000],]
   plot = prcomp(t(topBeta)) 
-  plotDat[[i]] = autoplot(plot, col = colours[i], data = datPheno, shape = "trainTest", size = 2) + 
+  plotDat[[i]] = autoplot(plot, col = colours[i], data = datPheno, shape = "trainTest", size = 5) + 
     theme_cowplot(18) + 
     ggtitle(levels(pheno$celltype)[i]) +
+    scale_shape_manual(values = c(21, 19)) +
     theme(legend.position = "none")
 }
 
@@ -116,17 +117,19 @@ plotsnoLeg = plot_grid(plotDat[[1]],
                        plotDat[[4]],
                        plotDat[[5]],
                        plotDat[[6]],
-                       ncol = 3, labels = "AUTO")
+                       ncol = 2, labels = "AUTO")
 legplot = ggplot(data.frame(one = betas[1, 1:10], two = betas[2, 1:10], tt = rep(c("Train", "Test"), 5)),
-                 aes(x = one, y = two, shape = tt)) + 
-  geom_point(size = 2) +
+                 aes(x = one, y = two, shape = tt)) +
+  scale_shape_manual(values = c(21, 19)) +
+  geom_point(size = 5) +
   labs(shape = "") +
   theme_cowplot(18)
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellTrainTestPCA.pdf", height = 9, width = 12)
-plot_grid(plotsnoLeg, get_legend(legplot), 
-          ncol = 2,
-          rel_widths = c(3, 0.3))
+pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellTrainTestPCA.pdf", height = 11, width = 9)
+plot_grid(plotsnoLeg, 
+          get_legend(legplot + theme(legend.justification="center" ,legend.position = "bottom")), 
+          ncol = 1,
+          rel_heights = c(2, 0.1))
 dev.off()
 
 # ## full PCA to show celltype similarity

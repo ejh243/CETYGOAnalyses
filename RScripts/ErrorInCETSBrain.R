@@ -70,6 +70,62 @@ save(betasCETS, phenoCETS, file = "/mnt/data1/Thea/humanDeconvolution/data/CETSU
 # save(betasCETSTest, phenoCETSTest,betasCETSTrain,phenoCETSTrain,
 #      file = "/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
 # 
+
+### PCA for CETS cell types ###########################
+## the PCA of all is in HumanBrainRBDM.R
+library(ggfortify)
+library(ggplot2)
+library(cowplot)
+library(scales)
+
+load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
+load("/mnt/data1/Thea/humanDeconvolution/data/cellTypeColours.Rdata")
+
+## subset data by cell type
+betasNP = cbind(betasCETSTrain[,which(phenoCETSTrain$Celltype == "NeuN+")],
+                betasCETSTest[,which(phenoCETSTest$Celltype == "NeuN+")])
+
+betasNN = cbind(betasCETSTrain[,which(phenoCETSTrain$Celltype == "NeuN-")],
+                betasCETSTest[,which(phenoCETSTest$Celltype == "NeuN-")])
+
+phenoNP = rbind(phenoCETSTrain[which(phenoCETSTrain$Celltype == "NeuN+"),],
+                phenoCETSTest[which(phenoCETSTest$Celltype == "NeuN+"),])
+
+phenoNN = rbind(phenoCETSTrain[which(phenoCETSTrain$Celltype == "NeuN-"),],
+                phenoCETSTest[which(phenoCETSTest$Celltype == "NeuN-"),])
+
+## PC plots
+plotDat = list() 
+betaVar = apply(betasNP, 1, var, na.rm = T)
+topBeta = betasNP[order(betaVar, decreasing = T)[1:1000],]
+plot = prcomp(t(topBeta[complete.cases(topBeta),])) 
+plotDat[[1]] = autoplot(plot, data = phenoNP, col = "Sex", shape = "TrainTest", size = 3) + 
+  scale_shape_manual(values = c(21, 19)) +
+  theme_cowplot(18) + 
+  ggtitle("NeuN+") +
+  labs(shape = "", col = "")
+
+
+betaVar1 = apply(betasNN, 1, var, na.rm = T)
+topBeta1 = betasNN[order(betaVar1, decreasing = T)[1:1000],]
+plot1 = prcomp(t(topBeta1[complete.cases(topBeta1),])) 
+plotDat[[2]] = autoplot(plot1, data = phenoNN, col = "Sex", shape = "TrainTest", size = 3) + 
+  scale_shape_manual(values = c(21, 19)) +
+  theme_cowplot(18) + 
+  ggtitle("NeuN-") +
+  theme(legend.position = "none")
+
+
+leg = get_legend(plotDat[[1]]+ theme(legend.justification="center" ,legend.position = "bottom"))
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSCelltypePCA.pdf", height = 10, width = 5)
+plot_grid(plotDat[[1]]+theme(legend.position = "none"),
+          plotDat[[2]],
+          leg, labels = c("A", "B", ""),
+          ncol = 1,
+          rel_heights = c(1,1,0.2))
+dev.off()
+
 # ### create model using test data ######################
 # load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
 # source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
