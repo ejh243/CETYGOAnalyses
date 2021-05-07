@@ -138,6 +138,42 @@ dev.off()
 # 
 # save(CETSmodel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
 
+### heatmap of model CpGs #############################
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
+
+## load data
+load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
+load("/mnt/data1/Thea/humanDeconvolution/data/cellTypeColours.Rdata")
+
+## load functions
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+modelBetas = GetModelCG(betasCETSTrain, list(CETSmodel))
+library(gplots)
+library(viridis)
+library(scales)
+library(ComplexHeatmap)
+
+col = list(Celltype = colOrdeByCell[c(1,3)])
+
+# Create the heatmap annotation
+ha <- HeatmapAnnotation(Celltype = phenoCETSTrain$Celltype,
+                        col = col)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/heatmapForModelCpGsCETS.pdf", height = 6, width = 5)
+Heatmap(modelBetas, name = "DNAm",
+        top_annotation = ha, show_row_names = F, show_column_names = F, show_row_dend = F)
+dev.off()
+
+### check annotation of model CpGs to chromosomes #####
+# x = read.csv("/mnt/data1/EPIC_reference/MethylationEPIC_v-1-0_B4.csv", skip = 7, header = T)
+x = load("/mnt/data1/450K_reference/AllProbeIlluminaAnno.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
+
+x = probeAnnot[,c("ILMNID", "CHR")]
+cpgInMod = x[x$ILMNID %in% rownames(CETSmodel$coefEsts),]
+table(cpgInMod$CHR)
+
 ### Compare sex application ###########################
 load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
 load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
@@ -163,7 +199,7 @@ t.test(pred$error[pred$Sex == "Female"], pred$error[pred$Sex != "Female"])
 ### compare error with noise ##########################
 load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
 load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
-load("/mnt/data1/Thea/humanDeconvolution/data/CETScols.Rdata")
+load("/mnt/data1/Thea/humanDeconvolution/data/cellTypeColours.Rdata")
 source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 
@@ -189,18 +225,15 @@ stackedWithNoise = ModelCompareStackedBar(testBetas = testData[[1]],
                                           nCpGPlot = F,
                                           sampleNamesOnPlots = F)
 
-# stackedWithNoise[[1]]
-# stackedWithNoise[[2]] + scale_fill_manual(values = c("#714a91", "#4ab9b0"))
-# stackedWithNoise[[3]] + scale_fill_manual(values = c("#714a91", "#4ab9b0", "#555353"))
 
-leg = get_legend(stackedWithNoise[[3]] + scale_fill_manual(values = c("#714a91", "#4ab9b0", "#555353"))
-                 + theme(legend.position=c(0.3,0.8),legend.direction = "horizontal", legend.title = element_blank())
+leg = get_legend(stackedWithNoise[[3]] + scale_fill_manual(values = c(colOrdeByCell[c(3,1)], "#555353"))
+                 + theme(legend.justification="center" ,legend.direction = "horizontal", legend.title = element_blank())
                  + guides(fill = guide_legend(nrow = 1)))
 plots = plot_grid(stackedWithNoise[[1]] + theme(legend.position = "none"),
                   stackedWithNoise[[2]] + theme(legend.position = "none") +
                     scale_y_continuous(breaks = seq(0,1,0.25))+
-                    scale_fill_manual(values = c("#714a91", "#4ab9b0")),
-                  stackedWithNoise[[3]] + theme(legend.position = "none") + scale_fill_manual(values = c("#714a91", "#4ab9b0", "#555353")), ncol = 1,
+                    scale_fill_manual(values = colOrdeByCell[c(3,1)]),
+                  stackedWithNoise[[3]] + theme(legend.position = "none") + scale_fill_manual(values = c(colOrdeByCell[c(3,1)], "#555353")), ncol = 1,
                   rel_heights = c(0.6,1,1), labels = "AUTO", axis = "rl", align = "v" )
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSsimWithNoise.pdf", height = 9, width = 7.5)     
@@ -324,7 +357,7 @@ ggplot(dat, aes(x = fct_reorder(TissueBrain, brain, .fun = median, .desc =TRUE))
   theme_cowplot(18) +
   scale_fill_manual(values = c("#0A8ABA", "#BA3A0A"), name = "Brain?", labels = c("No", "Yes")) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-  labs(x = element_blank(), y = "CETYGO") +
+  labs(x = element_blank(), y = "Cetygo") +
   geom_text(data = dat.pos, aes(TissueBrain, label = n, y = pos+0.02))
 dev.off()
 

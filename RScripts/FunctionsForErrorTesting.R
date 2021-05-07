@@ -254,7 +254,7 @@ PredictionErrorAndResiduals = function(model, testBetas, testPheno){
           geom_point(size = 2) +
           theme_cowplot(18) +
           ylim(c(0,max(plotDat$error)))+
-          labs(x = "|Actual - Predicted|", y = "CETYGO", shape = "Cell type", col = "Cell type"))
+          labs(x = "|Actual - Predicted|", y = "Cetygo", shape = "Cell type", col = "Cell type"))
 }
 
 
@@ -371,18 +371,18 @@ ModelCompareStackedBar = function(testBetas,
   ## plot error per sample per model
   if(sampleNamesOnPlots){
     plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
-      geom_point() +
+      geom_point(size = 2) +
       theme_cowplot(18) +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      labs(x = "Sample", y = "CETYGO") +
+      labs(x = "Sample", y = "Cetygo") +
       ylim(c(0, max(predictions$error)))
   }else{plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
-    geom_point() +
+    geom_point(size = 2) +
     theme_cowplot(18) +
     theme(axis.title.x=element_blank(),
           axis.text.x=element_blank(),
           axis.ticks.x=element_blank()) +
-    labs(x = "Sample", y = "CETYGO") +
+    labs(x = "Sample", y = "Cetygo") +
     ylim(c(0, max(predictions$error)))
   }
   
@@ -390,14 +390,14 @@ ModelCompareStackedBar = function(testBetas,
     ## plot nCpG per sample per model
     if(sampleNamesOnPlots){
       plotList[[2]] = ggplot(predictions, aes(x = sample, y = nCGmissing, col = model)) +
-        geom_point() +
+        geom_point(size = 2) +
         theme_cowplot(18) +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
         labs(x = "Sample", y = "CGs missing") +
         ylim(c(0, max(predictions$nCGmissing)))
     }else{
       plotList[[2]] = ggplot(predictions, aes(x = sample, y = nCGmissing, col = model)) +
-        geom_point() +
+        geom_point(size = 2) +
         theme_cowplot(18) +
         theme(axis.title.x=element_blank(),
               axis.text.x=element_blank(),
@@ -522,12 +522,12 @@ cellTypeCompareStackedBar = function(predictions){
     
     
     plotA = ggplot(plotDat, aes(x = fct_reorder(sample, error, .fun = mean), y = error)) +
-      geom_point() +
+      geom_point(size = 2) +
       theme_cowplot(18) +
       theme(axis.title.x=element_blank(),
             axis.text.x=element_blank(),
             axis.ticks.x=element_blank()) +
-      labs(x = "Sample", y = "CETYGO") +
+      labs(x = "Sample", y = "Cetygo") +
       ggtitle(paste(cellTypeName, "-", levels(predictions$DatasetOrigin)[i])) +
                 ylim(c(0, max(predictions$error)))
               
@@ -571,7 +571,7 @@ TrueVSPredictedPlot = function(pred, true){
   
   
   print(ggplot(plotDat, aes(x = proportion_pred, y = proportion_true, col = cellType, shape = cellType)) +
-          geom_point() +
+          geom_point(size = 2) +
           theme_cowplot(18) +
           labs(x= "Predicted", y = "Actual", shape = "Cell type", col = "Cell type"))
   
@@ -607,7 +607,7 @@ TrueVSPredictedMaintainCellsPlot = function(pred, true, cells = c(T,T,T,T,T), yl
   
   
   print(ggplot(plotDat, aes(x = proportion_pred, y = proportion_true, col = cellType, shape = cellType)) +
-          geom_point() +
+          geom_point(size = 2) +
           theme_cowplot(18) +
           labs(x= "Predicted", y = ylabel, shape = "Cell type", col = "Cell type") +
           scale_shape_manual(values=shapes) +
