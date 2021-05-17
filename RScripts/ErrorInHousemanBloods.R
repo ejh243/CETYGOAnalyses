@@ -104,7 +104,7 @@ for (i in 1:length(levels(pheno$celltype))){
   betaVar = apply(dat, 1, var, na.rm = T)
   topBeta = dat[order(betaVar, decreasing = T)[1:1000],]
   plot = prcomp(t(topBeta)) 
-  plotDat[[i]] = autoplot(plot, col = colours[i], data = datPheno, shape = "trainTest", size = 5) + 
+  plotDat[[i]] = autoplot(plot, col = colours[i], data = datPheno, shape = "trainTest", size = 2) + 
     theme_cowplot(18) + 
     ggtitle(levels(pheno$celltype)[i]) +
     scale_shape_manual(values = c(21, 19)) +
@@ -121,11 +121,12 @@ plotsnoLeg = plot_grid(plotDat[[1]],
 legplot = ggplot(data.frame(one = betas[1, 1:10], two = betas[2, 1:10], tt = rep(c("Train", "Test"), 5)),
                  aes(x = one, y = two, shape = tt)) +
   scale_shape_manual(values = c(21, 19)) +
-  geom_point(size = 5) +
+  geom_point(size = 2) +
   labs(shape = "") +
   theme_cowplot(18)
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellTrainTestPCA.pdf", height = 11, width = 9)
+
+png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellTrainTestPCA.png", height = 700, width = 550)
 plot_grid(plotsnoLeg, 
           get_legend(legplot + theme(legend.justification="center" ,legend.position = "bottom")), 
           ncol = 1,
@@ -650,12 +651,12 @@ pd = melt(plotDat, measure.vars = c("1","2","3","4","5","6","7","8","9","10"))
 
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithMissingCpGs.pdf", height = 4, width = 7) 
-
-ggplot(pd, aes(x = propMissing, y = value)) +
+ggplot(pd, aes(x = propMissing, y = value, fill = propMissing)) +
   geom_violin() +
   theme_cowplot(18) +
   scale_x_discrete(breaks=c(0, 0.25, 0.50, 0.75)) +
-  labs(x = "Proportion of CpGs missing", y = "Cetygo")
+  labs(x = "Proportion of CpGs missing", y = "Cetygo") +
+  theme(legend.position = "none")
 dev.off()
 
 
@@ -927,6 +928,7 @@ dat.pos = data.frame(TissueBlood = levels(dat$TissueBlood), pos, n = dat_summary
 pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexsAllTissueBoxplot.pdf", height = 9, width = 14)
 ggplot(dat, aes(x = fct_reorder(TissueBlood, blood, .fun = median, .desc =TRUE))) +
   geom_boxplot(aes(y = error, fill = as.factor(blood))) +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
   theme_cowplot(18) +
   scale_fill_manual(values = c("#0A8ABA", "#BA3A0A"), name = "Blood?", labels = c("No", "Yes")) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
@@ -1057,6 +1059,72 @@ dev.off()
 # ## get sample IDs for samples in GSE89251 with low error, bad pred and those with higher error
 # datBad[datBad$DatasetOrigin == "GSE89251" & datBad$trueProp < 0.5,"Sample"]
 # datB[datB$DatasetOrigin == "GSE89251" & datB$error > 0.2,"Sample"]
+
+
+### Essex look at the samples with low error ##########
+library(gdsfmt)
+gfile = openfn.gds("/mnt/data1/Thea/ErrorMetric/data/EssexOutput/sub.gds")
+
+dat = cbind.data.frame(read.gdsn(index.gdsn(gfile$root, "Pred")),
+                       Age = read.gdsn(index.gdsn(gfile$root, "Age")),
+                       Sex = read.gdsn(index.gdsn(gfile$root, "Sex")),
+                       Tissue = read.gdsn(index.gdsn(gfile$root, "Tissue")),
+                       SubTissue = read.gdsn(index.gdsn(gfile$root, "SubTissue")),
+                       Sample = read.gdsn(index.gdsn(gfile$root, "colnames")),
+                       DatasetOrigin = read.gdsn(index.gdsn(gfile$root, "DatasetOrigin")))
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+colnames(dat)[1:8] = c(colnames(HousemanBlood50CpGModel$coefEsts), "error", "nCGmissing")
+library(plyr)
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+
+## subset iPSCs to get accession code
+ipsc = dat[which(dat$Tissue == "induced Pluripotent Stem Cells"),]
+# GSE61461
+
+ipsc = ipsc[ipsc$error <0.1,]
+ipsc = ipsc[ipsc$DatasetOrigin == "GSE61461.gds",]
+
+# plotList1 = 
+p1 = ggplot(ipsc, aes(x = fct_reorder(Sample, error, .fun = median, .desc =F), y = error)) +
+  geom_point(size = 2) +
+  theme_cowplot(18) + 
+  geom_hline(yintercept = 0.1, linetype = "dashed", col = "red")+
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  labs(x = "Sample", y = "Cetygo") +
+  ylim(c(0, 0.1)) +
+  ggtitle("GSE61461 - iPSC cells")
+
+
+propDat = gather(ipsc, key = "cellType", value = "proportion_pred", 
+                         -one_of(c("error","nCGmissing", "Age",
+                                   "Sex","Tissue","SubTissue","Sample","DatasetOrigin")))
+
+propDat$cellType = as.factor(propDat$cellType)
+allCellTypes = levels(propDat$cellType)
+
+## create one colour for each cell type
+colPerCell = hue_pal()(length(allCellTypes))
+
+p2 = ggplot(propDat, aes(x = fct_reorder(Sample, error, .fun = median, .desc =F), y = proportion_pred, fill = cellType)) +
+  geom_bar(position="stack", stat="identity") +
+  theme_cowplot(18) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(), 
+        legend.position = "bottom", 
+        legend.justification = "centre") +
+  guides(fill = guide_legend(nrow = 1)) +
+  labs(x = "Sample", y = "Proportion", fill = "Cell type") +
+  scale_fill_manual(values = c(colPerCell)) +
+  scale_y_continuous(breaks = c(0.00,0.25,0.50,0.75,1.00)) 
+
+
+png("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/iPSCInBlood.png", height = 650, width = 575)
+plot_grid(p1, p2, ncol = 1, axis = "lr", align = "v", labels = "AUTO", rel_heights = c(0.6,1))
+dev.off()
 
 
 

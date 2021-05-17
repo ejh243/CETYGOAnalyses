@@ -99,7 +99,7 @@ plotDat = list()
 betaVar = apply(betasNP, 1, var, na.rm = T)
 topBeta = betasNP[order(betaVar, decreasing = T)[1:1000],]
 plot = prcomp(t(topBeta[complete.cases(topBeta),])) 
-plotDat[[1]] = autoplot(plot, data = phenoNP, col = "Sex", shape = "TrainTest", size = 3) + 
+plotDat[[1]] = autoplot(plot, data = phenoNP, col = "Sex", shape = "TrainTest", size = 2) + 
   scale_shape_manual(values = c(21, 19)) +
   theme_cowplot(18) + 
   ggtitle("NeuN+") +
@@ -109,7 +109,7 @@ plotDat[[1]] = autoplot(plot, data = phenoNP, col = "Sex", shape = "TrainTest", 
 betaVar1 = apply(betasNN, 1, var, na.rm = T)
 topBeta1 = betasNN[order(betaVar1, decreasing = T)[1:1000],]
 plot1 = prcomp(t(topBeta1[complete.cases(topBeta1),])) 
-plotDat[[2]] = autoplot(plot1, data = phenoNN, col = "Sex", shape = "TrainTest", size = 3) + 
+plotDat[[2]] = autoplot(plot1, data = phenoNN, col = "Sex", shape = "TrainTest", size = 2) + 
   scale_shape_manual(values = c(21, 19)) +
   theme_cowplot(18) + 
   ggtitle("NeuN-") +
@@ -118,7 +118,7 @@ plotDat[[2]] = autoplot(plot1, data = phenoNN, col = "Sex", shape = "TrainTest",
 
 leg = get_legend(plotDat[[1]]+ theme(legend.justification="center" ,legend.position = "bottom"))
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSCelltypePCA.pdf", height = 10, width = 5)
+png("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSCelltypePCA.png", height = 700, width = 350)
 plot_grid(plotDat[[1]]+theme(legend.position = "none"),
           plotDat[[2]],
           leg, labels = c("A", "B", ""),
@@ -312,7 +312,7 @@ dev.off()
 ## load
 load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
 load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
-load("/mnt/data1/Thea/humanDeconvolution/data/CETScols.Rdata")
+load("/mnt/data1/Thea/humanDeconvolution/data/cellTypeColours.Rdata")
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 library(gdsfmt)
 library(bigmelon)
@@ -354,6 +354,7 @@ dat.pos = data.frame(TissueBrain = levels(dat$TissueBrain), pos, n = dat_summary
 pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/ErrorCETSEssexsAllTissueBoxplot.pdf", height = 9, width = 14)
 ggplot(dat, aes(x = fct_reorder(TissueBrain, brain, .fun = median, .desc =TRUE))) +
   geom_boxplot(aes(y = error, fill = as.factor(brain))) +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
   theme_cowplot(18) +
   scale_fill_manual(values = c("#0A8ABA", "#BA3A0A"), name = "Brain?", labels = c("No", "Yes")) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +

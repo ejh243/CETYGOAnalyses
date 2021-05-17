@@ -373,12 +373,15 @@ ModelCompareStackedBar = function(testBetas,
     plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
       geom_point(size = 2) +
       theme_cowplot(18) +
+      geom_hline(yintercept = 0.1, linetype = "dashed", col = "red")+
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
       labs(x = "Sample", y = "Cetygo") +
       ylim(c(0, max(predictions$error)))
   }else{plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
     geom_point(size = 2) +
     theme_cowplot(18) +
+    
+    geom_hline(yintercept = 0.1, linetype = "dashed", col = "red")+
     theme(axis.title.x=element_blank(),
           axis.text.x=element_blank(),
           axis.ticks.x=element_blank()) +
