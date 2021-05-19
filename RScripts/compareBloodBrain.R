@@ -51,13 +51,41 @@ brain = brainDat[which(brainDat$brain == 1 | brainDat$Tissue == "Blood"),]
 library(dplyr)
 dat = inner_join(blood, brain, by = c("Sample" = "FullBarCode"))
 
-
+png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/brainBloodPredicted.png",
+    height = 550, width = 600)
 ggplot(dat, aes(x = error.x, y = error.y, col = Tissue.x)) +
-  geom_point(size = 2, shape = 21) +
+  geom_point(size = 2.5, shape = 21) +
   geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
   geom_vline(xintercept = 0.1, col = "red", linetype = "dashed") +
   theme_cowplot(18) +
   labs(x = "Cetygo in blood RBDM", y = "Cetygo in brain RBDM", col = "Tissue")
+dev.off()
+
+## get sample sizes of each tissue in each quadrant
+head(dat)
+sum(dat$Tissue.x[dat$error.x <0.1] == "Blood")
+sum(dat$Tissue.x[dat$error.x <0.1] == "Brain")
+
+sum(dat$Tissue.x[dat$error.y <0.1] == "Blood")
+sum(dat$Tissue.x[dat$error.y <0.1] == "Brain")
+
+sum(dat$Tissue.x[dat$error.y >0.1 & dat$error.x >0.1] == "Blood")
+sum(dat$Tissue.x[dat$error.y >0.1 & dat$error.x >0.1] == "Brain")
+
+# error.x = blood error
+# error.y = brain error
+dat$DatasetOrigin.x = as.factor(as.character(dat$DatasetOrigin.x))
+
+## brain predicted as blood
+brAsBl = dat[which(dat$error.y <0.1 & dat$Tissue.x == "Blood"),]
+
+## proportion of the dataset that is 'brain'
+propWrongBrainTissue = 1-(table(dat$DatasetOrigin.x)-table(brAsBl$DatasetOrigin.x))/table(dat$DatasetOrigin.x)
+
+propWrongBrainTissue = as.data.frame(propWrongBrainTissue[propWrongBrainTissue!=0])
+ggplot(propWrongBrainTissue, aes(y = Freq)) +
+  geom_boxplot() +
+  theme_cowplot(18)
 
 
 unique(dat$DatasetOrigin.x[which(dat$error.y <0.1 & dat$Tissue.x == "Blood")])

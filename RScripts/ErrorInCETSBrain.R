@@ -191,6 +191,8 @@ ggplot(pred, aes(x = Sex, y = error, fill = Sex)) +
   geom_violin() +
   theme_cowplot(18) +
   theme(legend.position = "none") +
+  ylim(c(0,0.10)) +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
   labs(y = "Cetygo") 
 dev.off()
 
@@ -237,6 +239,7 @@ plots = plot_grid(stackedWithNoise[[1]] + theme(legend.position = "none"),
                   rel_heights = c(0.6,1,1), labels = "AUTO", axis = "rl", align = "v" )
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSsimWithNoise.pdf", height = 9, width = 7.5)     
+png("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSsimWithNoise.png", height = 800, width = 600)     
 print(plot_grid(plots, leg, ncol = 1, rel_heights = c(1,0.08)))
 dev.off()
 
@@ -424,64 +427,65 @@ pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSERRORviolinPaiCets.pdf
 ggplot(plotDat, aes(x = dat, y = error, fill = dat)) +
   geom_violin() +
   theme_cowplot(18) +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
   scale_fill_manual(values = c("#c2c2c2", "white")) +
   theme(legend.position = "none") +
-  labs(x = "Dataset", y = "DSRMSE")
+  labs(x = "Dataset", y = "Cetygo")
 dev.off()
 
 x = t.test(plotDat$error[plotDat$dat == "PAI"],plotDat$error[plotDat$dat != "PAI"])
 
-pred$dist = abs(pred$`NeuN+`-1)
-pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/ERRORCETSabsdifVSerror.pdf")
-ggplot(pred, aes(x = dist, y = error))+
-  geom_point() + 
-  theme_cowplot(18) +
-  labs(x = "Absolute difference between true and\npredicted proportion of NeuN+ ", y = "DSRMSE")
-dev.off()
-
-cor(pred$dist, pred$error)
+# pred$dist = abs(pred$`NeuN+`-1)
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/ERRORCETSabsdifVSerror.pdf")
+# ggplot(pred, aes(x = dist, y = error))+
+#   geom_point() + 
+#   theme_cowplot(18) +
+#   labs(x = "Absolute difference between true and\npredicted proportion of NeuN+ ", y = "Cetygo")
+# dev.off()
+# 
+# cor(pred$dist, pred$error)
 
 
 
 
 ### Create model in Caucasians and test in Caucasian and African ####
-## to see if ethnic differences are picked up
-load("/mnt/data1/Thea/humanDeconvolution/data/CETSUnnormalised.RData")
-
-## n needed in test
-length(levels(phenoCETS$Individual))*.5 # 14
-
-## subset to NeuN+ to have individuals not samples
-temp = phenoCETS[phenoCETS$Celltype == "NeuN+",]
-
-## randomly select 12 Caucasian samples
-temp = temp[temp$Ethnicity == "Caucasian",]
-set.seed(1234)
-CTest = temp$Individual[sample(nrow(temp), 12)]
-
-phenoCETS$TrainTestnNeeded = "Test"
-phenoCETS$TrainTestnNeeded[phenoCETS$Individual %in% as.numeric(as.character(CTest))] = "Train"
-
-betasCETSTest = betasCETS[,phenoCETS$TrainTestnNeeded == "Test"]
-phenoCETSTest = phenoCETS[phenoCETS$TrainTestnNeeded == "Test",]
-
-betasCETSTrain = betasCETS[,phenoCETS$TrainTestnNeeded == "Train"]
-phenoCETSTrain = phenoCETS[phenoCETS$TrainTestnNeeded == "Train",]
-
-save(betasCETSTest, phenoCETSTest,betasCETSTrain, phenoCETSTrain,
-     file = "/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTestEthnicity.RData")
-
-## create model
-load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTestEthnicity.RData")
-source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
-
-CETSmodel = pickCompProbes(rawbetas = betasCETSTrain,
-                           cellTypes = levels(as.factor(as.character(phenoCETSTrain$Celltype))),
-                           cellInd = as.factor(as.character(phenoCETSTrain$Celltype)),
-                           numProbes = 50,
-                           probeSelect = "auto")
-
-save(CETSmodel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpGEthnicity.Rdata")
+# ## to see if ethnic differences are picked up
+# load("/mnt/data1/Thea/humanDeconvolution/data/CETSUnnormalised.RData")
+# 
+# ## n needed in test
+# length(levels(phenoCETS$Individual))*.5 # 14
+# 
+# ## subset to NeuN+ to have individuals not samples
+# temp = phenoCETS[phenoCETS$Celltype == "NeuN+",]
+# 
+# ## randomly select 12 Caucasian samples
+# temp = temp[temp$Ethnicity == "Caucasian",]
+# set.seed(1234)
+# CTest = temp$Individual[sample(nrow(temp), 12)]
+# 
+# phenoCETS$TrainTestnNeeded = "Test"
+# phenoCETS$TrainTestnNeeded[phenoCETS$Individual %in% as.numeric(as.character(CTest))] = "Train"
+# 
+# betasCETSTest = betasCETS[,phenoCETS$TrainTestnNeeded == "Test"]
+# phenoCETSTest = phenoCETS[phenoCETS$TrainTestnNeeded == "Test",]
+# 
+# betasCETSTrain = betasCETS[,phenoCETS$TrainTestnNeeded == "Train"]
+# phenoCETSTrain = phenoCETS[phenoCETS$TrainTestnNeeded == "Train",]
+# 
+# save(betasCETSTest, phenoCETSTest,betasCETSTrain, phenoCETSTrain,
+#      file = "/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTestEthnicity.RData")
+# 
+# ## create model
+# load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTestEthnicity.RData")
+# source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+# 
+# CETSmodel = pickCompProbes(rawbetas = betasCETSTrain,
+#                            cellTypes = levels(as.factor(as.character(phenoCETSTrain$Celltype))),
+#                            cellInd = as.factor(as.character(phenoCETSTrain$Celltype)),
+#                            numProbes = 50,
+#                            probeSelect = "auto")
+# 
+# save(CETSmodel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpGEthnicity.Rdata")
 
 ## apply model
 load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpGEthnicity.Rdata")
@@ -499,6 +503,7 @@ pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSEthnicityViolin.pdf", 
 ggplot(plotDat, aes(x = Ethnicity, y = error, fill = Ethnicity)) +
   geom_violin() +
   theme_cowplot(18) +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
   scale_fill_manual(values = c("#c2c2c2", "white")) +
   theme(legend.position = "none") +
   labs(y = "Cetygo", x = "Ethnicity") +

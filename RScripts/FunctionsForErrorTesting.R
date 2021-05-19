@@ -346,7 +346,8 @@ ModelCompareStackedBar = function(testBetas,
                                   noise = F,
                                   trueProportions = NA,
                                   nCpGPlot = F,
-                                  sampleNamesOnPlots = F){
+                                  sampleNamesOnPlots = F,
+                                  line = F){
   
   plotList = list()
   
@@ -369,25 +370,41 @@ ModelCompareStackedBar = function(testBetas,
   }
   
   ## plot error per sample per model
-  if(sampleNamesOnPlots){
-    plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
+  if(line){
+    if(sampleNamesOnPlots){
+      plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
+        geom_point(size = 2) +
+        theme_cowplot(18) +
+        geom_hline(yintercept = 0.1, linetype = "dashed", col = "red")+
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+        labs(x = "Sample", y = "Cetygo") +
+        ylim(c(0, max(predictions$error)))
+    }else{plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
       geom_point(size = 2) +
       theme_cowplot(18) +
       geom_hline(yintercept = 0.1, linetype = "dashed", col = "red")+
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+      theme(axis.title.x=element_blank(),
+            axis.text.x=element_blank(),
+            axis.ticks.x=element_blank()) +
       labs(x = "Sample", y = "Cetygo") +
       ylim(c(0, max(predictions$error)))
-  }else{plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
-    geom_point(size = 2) +
-    theme_cowplot(18) +
-    
-    geom_hline(yintercept = 0.1, linetype = "dashed", col = "red")+
-    theme(axis.title.x=element_blank(),
-          axis.text.x=element_blank(),
-          axis.ticks.x=element_blank()) +
-    labs(x = "Sample", y = "Cetygo") +
-    ylim(c(0, max(predictions$error)))
-  }
+    }}else{
+      if(sampleNamesOnPlots){
+        plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
+          geom_point(size = 2) +
+          theme_cowplot(18) +
+          theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+          labs(x = "Sample", y = "Cetygo") +
+          ylim(c(0, max(predictions$error)))
+      }else{plotList[[1]] = ggplot(predictions, aes(x = sample, y = error, col = model)) +
+        geom_point(size = 2) +
+        theme_cowplot(18) +
+        theme(axis.title.x=element_blank(),
+              axis.text.x=element_blank(),
+              axis.ticks.x=element_blank()) +
+        labs(x = "Sample", y = "Cetygo") +
+        ylim(c(0, max(predictions$error)))}
+    }
   
   if(nCpGPlot == T){
     ## plot nCpG per sample per model
@@ -527,27 +544,28 @@ cellTypeCompareStackedBar = function(predictions){
     plotA = ggplot(plotDat, aes(x = fct_reorder(sample, error, .fun = mean), y = error)) +
       geom_point(size = 2) +
       theme_cowplot(18) +
+      geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
       theme(axis.title.x=element_blank(),
             axis.text.x=element_blank(),
             axis.ticks.x=element_blank()) +
       labs(x = "Sample", y = "Cetygo") +
       ggtitle(paste(cellTypeName, "-", levels(predictions$DatasetOrigin)[i])) +
-                ylim(c(0, max(predictions$error)))
-              
-              plotB =  ggplot(plotDat, aes(x = fct_reorder(sample, error, .fun = mean), y = proportion_pred, fill = cellType)) +
-                geom_bar(position="stack", stat="identity") +
-                theme_cowplot(18) +
-                theme(axis.title.x=element_blank(),
-                      axis.text.x=element_blank(),
-                      axis.ticks.x=element_blank()) +
-                labs(x = "Sample", y = "Proportion", fill = "Cell type") +
-                scale_fill_manual(values = c(colPerCell[colNeeded]))
-              
-              plotList[[i]] = plot_grid(plotA, plotB, 
-                                        labels = "AUTO", ncol = 1,
-                                        rel_heights = c(0.4,1), 
-                                        align = "v", axis = "r")
-              
+      ylim(c(0, max(predictions$error)))
+    
+    plotB =  ggplot(plotDat, aes(x = fct_reorder(sample, error, .fun = mean), y = proportion_pred, fill = cellType)) +
+      geom_bar(position="stack", stat="identity") +
+      theme_cowplot(18) +
+      theme(axis.title.x=element_blank(),
+            axis.text.x=element_blank(),
+            axis.ticks.x=element_blank()) +
+      labs(x = "Sample", y = "Proportion", fill = "Cell type") +
+      scale_fill_manual(values = c(colPerCell[colNeeded]))
+    
+    plotList[[i]] = plot_grid(plotA, plotB, 
+                              labels = "AUTO", ncol = 1,
+                              rel_heights = c(0.4,1), 
+                              align = "v", axis = "r")
+    
   }
   return(plotList)
 }
