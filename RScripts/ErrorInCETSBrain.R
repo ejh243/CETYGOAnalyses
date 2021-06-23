@@ -435,17 +435,20 @@ dev.off()
 
 x = t.test(plotDat$error[plotDat$dat == "PAI"],plotDat$error[plotDat$dat != "PAI"])
 
-# pred$dist = abs(pred$`NeuN+`-1)
-# pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/ERRORCETSabsdifVSerror.pdf")
-# ggplot(pred, aes(x = dist, y = error))+
-#   geom_point() + 
-#   theme_cowplot(18) +
-#   labs(x = "Absolute difference between true and\npredicted proportion of NeuN+ ", y = "Cetygo")
-# dev.off()
-# 
-# cor(pred$dist, pred$error)
 
 
+cor(pred$`NeuN+`, pred$error)
+
+library(scales)
+hue_pal()(2)
+
+png("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSERRORscatterPaiCets.png", height = 500, width = 500)
+ggplot(pred, aes(x = `NeuN+`, y = error)) +
+  geom_point(col = "#F8766D", size = 2.5) +
+  geom_smooth(method = "lm", formula= y~x, se=F, col = "#F8766D") +
+  theme_cowplot(18) +
+  labs(x = "Predicted proportion (NeuN+)", y = "Cetygo")
+dev.off()
 
 
 ### Create model in Caucasians and test in Caucasian and African ####
