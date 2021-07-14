@@ -423,17 +423,17 @@ library(cowplot)
 plotDat = rbind.data.frame(pred, x)
 # plotDat = rbind.data.frame(pred[,-which(colnames(pred) =="dist")], x)
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSERRORviolinPaiCets.pdf")
-ggplot(plotDat, aes(x = dat, y = error, fill = dat)) +
-  geom_violin() +
-  theme_cowplot(18) +
-  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
-  scale_fill_manual(values = c("#c2c2c2", "white")) +
-  theme(legend.position = "none") +
-  labs(x = "Dataset", y = "Cetygo")
-dev.off()
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSERRORviolinPaiCets.pdf")
+# ggplot(plotDat, aes(x = dat, y = error, fill = dat)) +
+#   geom_violin() +
+#   theme_cowplot(18) +
+#   geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+#   scale_fill_manual(values = c("#c2c2c2", "white")) +
+#   theme(legend.position = "none") +
+#   labs(x = "Dataset", y = "Cetygo")
+# dev.off()
 
-x = t.test(plotDat$error[plotDat$dat == "PAI"],plotDat$error[plotDat$dat != "PAI"])
+# x = t.test(plotDat$error[plotDat$dat == "PAI"],plotDat$error[plotDat$dat != "PAI"])
 
 
 
@@ -442,12 +442,16 @@ cor(pred$`NeuN+`, pred$error)
 library(scales)
 hue_pal()(2)
 
+pred$header = "NeuN+ (Cor = -0.18)"
+
 png("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSERRORscatterPaiCets.png", height = 500, width = 500)
 ggplot(pred, aes(x = `NeuN+`, y = error)) +
   geom_point(col = "#F8766D", size = 2.5) +
   geom_smooth(method = "lm", formula= y~x, se=F, col = "#F8766D") +
   theme_cowplot(18) +
-  labs(x = "Predicted proportion (NeuN+)", y = "Cetygo")
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  facet_wrap(~header) +
+  labs(x = "Predicted proportion", y = "Cetygo")
 dev.off()
 
 

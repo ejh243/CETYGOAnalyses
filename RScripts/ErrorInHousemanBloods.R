@@ -1461,6 +1461,9 @@ betas = referenceRGset[,index]
 U = getBeta(preprocessRaw(betas))
 N = getBeta(preprocessQuantile(betas, sex = "M"))
 
+
+
+
 mU = U[rownames(U) %in% rownames(HousemanBlood50CpGModel$coefEsts),]
 mN = N[rownames(N) %in% rownames(HousemanBlood50CpGModel$coefEsts),]
 
@@ -1492,3 +1495,68 @@ median(abs(Uc - Nc), na.rm = T)
 median(abs(mUc - mNc), na.rm = T)
 
 
+
+
+### EX/US median sample intensity vs Cetygo ####
+
+## load data
+dat = read.csv("/mnt/data1/EXTEND/Methylation/QC/Batch1/EXTEND_RIST_SamplesFailedQC.csv")
+
+# # write.table(dat$Basename, file = "/mnt/data1/Thea/ErrorMetric/data/EXTENDFailedBasenames.txt", append = FALSE, sep = "\t",
+# #             row.names = F, col.names = F, quote = F)
+# 
+# idats = list.files("/mnt/data1/Thea/ErrorMetric/data/EXTENDFailedIdats/")[seq(1,70,2)]
+# idats = unlist(strsplit(idats,  "_G"))[seq(1,70,2)]
+# 
+# sum(idats %in% dat$Basename)
+# 
+# library(wateRmelon)
+# mSet <-  readEPIC(idatPath="/mnt/data1/Thea/ErrorMetric/data/EXTENDFailedIdats", barcodes=dat$Basename, parallel = FALSE, force=T)
+# save(mSet, file = "/mnt/data1/Thea/ErrorMetric/data/EXTENDFailedMset.Rdata")
+
+# load("/mnt/data1/EXTEND/Methylation/QC/Batch1/EXTEND_batch1_RIST_Normalised.rdat")
+# load("/mnt/data1/Thea/ErrorMetric/data/EXTENDFailedMset.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+library(wateRmelon)
+load("/mnt/data1/Josh/PPMI/Methylation_data/Pipeline/mSetPPMI.Rdata")
+pheno = read.csv("/mnt/data1/Josh/PPMI/Methylation_data/Pipeline/QCmetrics_full.csv")
+
+betas = betas(msetEPIC)
+M = methylated(msetEPIC)
+U = unmethylated(msetEPIC)
+
+# rm(mSet)
+
+pred = as.data.frame(projectCellTypeWithError(betas, "ownModel", ownModelData = HousemanBlood50CpGModel))
+
+pred$M = apply(M,2, median)
+pred$U = apply(U,2, median)
+  
+  
+library(ggplot2)
+library(cowplot)
+
+
+p1 = ggplot(pred, aes(x = M, y = error)) +
+  geom_point(size = 2.5) +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  theme_cowplot(18) +
+  labs(y = "Cetygo", x = "Median methylated intensity") +
+  ylim(c(0, max(pred$error)))
+  
+
+p2 = ggplot(pred, aes(x = U, y = error)) +
+  geom_point(size = 2.5) +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  theme_cowplot(18)+
+  ylab("Cetygo") +
+  labs(y = "Cetygo", x = "Median unmethylated intensity") +
+  ylim(c(0, max(pred$error)))
+
+png("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/CetygoAndIntensityBloodPPMI.png", height = 600, width = 500)
+plot_grid(p1,p2, ncol = 1, labels = "AUTO")
+dev.off()
