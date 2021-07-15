@@ -515,7 +515,7 @@ ModelCompareStackedBar = function(testBetas,
 ##        cellTypeName 
 
 ## OUTPUT plotList
-cellTypeCompareStackedBar = function(predictions){
+cellTypeCompareStackedBar = function(predictions, labPerPlot = "AUTO", legendPosition = "default", BonlyForLeg = F){
   
   cellTypeName = as.character(predictions$Tissue[1])
   
@@ -552,6 +552,7 @@ cellTypeCompareStackedBar = function(predictions){
       ggtitle(paste(cellTypeName, "-", levels(predictions$DatasetOrigin)[i])) +
       ylim(c(0, max(predictions$error)))
     
+    if(legendPosition == "default"){
     plotB =  ggplot(plotDat, aes(x = fct_reorder(sample, error, .fun = mean), y = proportion_pred, fill = cellType)) +
       geom_bar(position="stack", stat="identity") +
       theme_cowplot(18) +
@@ -560,9 +561,22 @@ cellTypeCompareStackedBar = function(predictions){
             axis.ticks.x=element_blank()) +
       labs(x = "Sample", y = "Proportion", fill = "Cell type") +
       scale_fill_manual(values = c(colPerCell[colNeeded]))
+    }else(plotB =  ggplot(plotDat, aes(x = fct_reorder(sample, error, .fun = mean), y = proportion_pred, fill = cellType)) +
+            geom_bar(position="stack", stat="identity") +
+            theme_cowplot(18) +
+            theme(axis.title.x=element_blank(),
+                  axis.text.x=element_blank(),
+                  axis.ticks.x=element_blank(),
+                  legend.position = legendPosition) +
+            labs(x = "Sample", y = "Proportion", fill = "Cell type") +
+            scale_fill_manual(values = c(colPerCell[colNeeded])))
     
+    if(BonlyForLeg){
+      return(plotB)
+    }
+   
     plotList[[i]] = plot_grid(plotA, plotB, 
-                              labels = "AUTO", ncol = 1,
+                              labels = labPerPlot, ncol = 1,
                               rel_heights = c(0.4,1), 
                               align = "v", axis = "r")
     
