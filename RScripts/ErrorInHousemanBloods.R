@@ -1027,10 +1027,20 @@ datB$Tissue = as.factor(as.character(datB$Tissue))
 for(i in 1:length(levels(datB$Tissue))){
   plotList = c(plotList, 
                cellTypeCompareStackedBar(
-                 datB[datB$Tissue == levels(datB$Tissue)[i],], labPerPlot = c(" i", "  ii"),
+                 datB[datB$Tissue == levels(datB$Tissue)[i],], labPerPlot = c("   i", "  ii"),
                  legendPosition = "none"))
 }
-
+plotN = list(
+GSE110607 = c(1, 5, 9),
+GSE117050 = c(11),
+GSE89251 = c(22),
+GSE49618 = c(2, 13),
+GSE67170 = c(16),
+GSE71955 = c(17),
+GSE87095 = c(3),
+GSE87582 = c(20),
+GSE88824 = c(4, 7, 21))
+  
 plotLeg = get_legend(cellTypeCompareStackedBar(
   datB[datB$Tissue == levels(datB$Tissue)[i],], BonlyForLeg = T))
 
@@ -1040,23 +1050,29 @@ plotLeg = get_legend(cellTypeCompareStackedBar(
 #   dev.off()
 # }
 
-for(i in 1:6){
-  if(i !=6){
-    p = plot_grid(plotList[[1+(i-1)*4]] , plotList[[2+(i-1)*4]],
-                  plotList[[3+(i-1)*4]],plotList[[4+(i-1)*4]],
-                  labels = "AUTO")
-    png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".png", sep = ""), height = 800, width = 650)
-    print(plot_grid(p, plotLeg, ncol = 2, rel_widths = c(1,0.15)))
-    dev.off()
-  }else{
-    p = plot_grid(plotList[[1+(i-1)*4]] , plotList[[2+(i-1)*4]],
-                  labels = "AUTO", ncol = 1)
-    png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".png", sep = ""), height = 800, width = 400)
+for(i in 1:length(plotN)){
+  if(length(plotN[[i]]) ==1){
+    p = plotList[[plotN[[i]]]]
+    png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".png", sep = ""), height = 600, width = 650)
     print(plot_grid(p, plotLeg, ncol = 2, rel_widths = c(1,0.3)))
     dev.off()
   }
+  
+  if(length(plotN[[i]]) ==2){
+    p = plot_grid(plotList[[plotN[[i]][1]]] , plotList[[plotN[[i]][2]]],
+                  labels = "AUTO", ncol = 2)
+    png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".png", sep = ""), height = 400, width = 700)
+    print(plot_grid(p, plotLeg, ncol = 2, rel_widths = c(2,0.3)))
+    dev.off()
+  }
+  if(length(plotN[[i]]) ==3){
+  p = plot_grid(plotList[[plotN[[i]][1]]] , plotList[[plotN[[i]][2]]], plotList[[plotN[[i]][3]]],
+                labels = "AUTO", ncol = 3)
+  png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".png", sep = ""), height = 400, width = 900)
+  print(plot_grid(p, plotLeg, ncol = 2, rel_widths = c(3,0.3)))
+  dev.off()
 }
-
+}
 
 
 

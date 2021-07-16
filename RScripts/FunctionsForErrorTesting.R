@@ -518,6 +518,7 @@ ModelCompareStackedBar = function(testBetas,
 cellTypeCompareStackedBar = function(predictions, labPerPlot = "AUTO", legendPosition = "default", BonlyForLeg = F){
   
   cellTypeName = as.character(predictions$Tissue[1])
+  cellTypeName[cellTypeName == "Granulocytes"] = "Gran"
   
   predictions$sample = rownames(predictions)
   predictions = gather(predictions, key = "cellType", value = "proportion_pred", 
