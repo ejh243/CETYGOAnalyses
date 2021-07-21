@@ -560,6 +560,7 @@ cellTypeCompareStackedBar = function(predictions, labPerPlot = "AUTO", legendPos
       theme(axis.title.x=element_blank(),
             axis.text.x=element_blank(),
             axis.ticks.x=element_blank()) +
+      scale_y_continuous(breaks = seq(0,1,0.25)) +
       labs(x = "Sample", y = "Proportion", fill = "Cell type") +
       scale_fill_manual(values = c(colPerCell[colNeeded]))
     }else(plotB =  ggplot(plotDat, aes(x = fct_reorder(sample, error, .fun = mean), y = proportion_pred, fill = cellType)) +
@@ -569,6 +570,7 @@ cellTypeCompareStackedBar = function(predictions, labPerPlot = "AUTO", legendPos
                   axis.text.x=element_blank(),
                   axis.ticks.x=element_blank(),
                   legend.position = legendPosition) +
+            scale_y_continuous(breaks = seq(0,1,0.25)) +
             labs(x = "Sample", y = "Proportion", fill = "Cell type") +
             scale_fill_manual(values = c(colPerCell[colNeeded])))
     
@@ -578,8 +580,8 @@ cellTypeCompareStackedBar = function(predictions, labPerPlot = "AUTO", legendPos
    
     plotList[[i]] = plot_grid(plotA, plotB, 
                               labels = labPerPlot, ncol = 1,
-                              rel_heights = c(0.4,1), 
-                              align = "v", axis = "r")
+                              rel_heights = c(0.5,1), 
+                              align = "v", axis = "rl")
     
   }
   return(plotList)
@@ -781,4 +783,75 @@ t.testMatrix = function(dat, pair = T, altVal = "two.sided", LaTex = F){
     return(outmat)
   }
   return(xtable(outmat))
+}
+
+
+
+### nCellsNeededForDeconvolution ######################
+
+##  INPUT: betas - purified cell betas matrix
+##         phenoCell - cell type column of the phenotype data
+
+## OUTPUT: plot of accuracy (RMSE?) vs n samples per cell type in model
+
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+
+## testing data
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+rm(betasTrain, betasTest, phenoTest, phenoTrain)
+
+phenoCell = pheno$celltype
+
+modMatRow = modMat[1,]
+
+nCellsNeededForDeconvolution = function(betas, phenoCell){
+  
+  nPerCelltype = min(table(phenoCell))
+  celltypes = levels(phenoCell)
+  
+  # matrix of possible inclusions of individual
+  modMat = as.matrix(expand.grid(lapply(numeric(nPerCelltype), function(x) c(T, F))))
+  modMat = modMat[rowSums(modMat)>1 &rowSums(modMat) <6, ]
+  
+  
+  createAndApplyRBDM = function(modMatRow){
+  
+    trainIndex = c()
+    for(cell in celltypes){
+      trainIndex = c(trainIndex, which(phenoCell== cell)[modMatRow])
+    }
+
+    trainB = betas[,trainIndex] 
+    testB = betas[,-trainIndex] 
+    
+    trainP = phenoCell[trainIndex]
+    testP = phenoCell[-trainIndex]
+    
+    ## create model
+    model = pickCompProbes(trainB, cellTypes = celltypes,
+                           cellInd = trainP,
+                           numProbes =  50,
+                           probeSelect = "auto")
+    
+    ## create testing data using simulation framework
+
+    
+    
+  }
+  
+  
+}
+
+
+simPropMaker3 = function(model){
+  
+  
+  modMat = as.matrix(expand.grid(lapply(numeric(nPerCelltype), function(x) seq(0,1,0.25))))
+  modMat = modMat[rowSums(modMat)==1, ]
+  
+  
+  
+  simBetas = sapply(modMat,1,function(x){colSums(t(x*t(model$coefEsts)))})
+  
 }

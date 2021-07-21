@@ -710,14 +710,38 @@ ggplot(allPheno, aes(x = data, y = error, fill = sex)) +
 dev.off()
 
 ## create age from 38 phenotype
-allPheno$ageDiff = abs(as.numeric(as.character(allPheno$age))-38)
+# allPheno$ageDiff = abs(as.numeric(as.character(allPheno$age))-38)
+
+## load reference data ages
+# load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+# library(minfi)
+# library(wateRmelon)
+# library(FlowSorted.Blood.450k)
+# library("IlluminaHumanMethylation450kanno.ilmn12.hg19")
+# 
+# compositeCellType = "Blood"
+# platform<-"450k"
+# referencePkg <- sprintf("FlowSorted.%s.%s", compositeCellType, platform)
+# data(list = referencePkg)
+# referenceRGset <- get(referencePkg)
+# phenoDat = pData(referenceRGset)
+# 
+# phenoDat
+
+# library(GEOquery)
+# gse <- getGEO('GSE35069',GSEMatrix=TRUE)
+# pheno <- pData(phenoData(gse[[1]]))
+
+## Age of test data not available, only mean and SD, so plot those!
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/ageAcrossEXandUS.pdf", height = 7, width = 7) 
-ggplot(allPheno, aes(x = ageDiff, y = error, col = data)) +
+ggplot(allPheno, aes(x = as.numeric(as.character(age)), y = error, col = data)) +
   geom_point() +
   geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  geom_vline(xintercept = c(38-13.6, 38+13.6), linetype = "dashed") +
+  geom_vline(xintercept = 38) +
   theme_cowplot(18) +
-  labs(y = "Cetygo", x = "Absolute age difference", col = "Dataset")
+  labs(y = "Cetygo", x = "Age", col = "Dataset")
 dev.off()
 
 t.test(allPheno[allPheno$sex == "Female","error"], allPheno[allPheno$sex == "Male","error"], alternative = "greater")
@@ -1012,6 +1036,7 @@ dev.off()
 
 ## stacked bar charts for each study in each cell type
 ## B cells
+load("/mnt/data1/Thea/ErrorMetric/data/bloodPurifiedPredictedFromEssex.Rdata")
 source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 
 # predictions = datB[datB$Tissue == "T Cells",]
@@ -1030,6 +1055,7 @@ for(i in 1:length(levels(datB$Tissue))){
                  datB[datB$Tissue == levels(datB$Tissue)[i],], labPerPlot = c("   i", "  ii"),
                  legendPosition = "none"))
 }
+
 plotN = list(
 GSE110607 = c(1, 5, 9),
 GSE117050 = c(11),
@@ -1053,7 +1079,7 @@ plotLeg = get_legend(cellTypeCompareStackedBar(
 for(i in 1:length(plotN)){
   if(length(plotN[[i]]) ==1){
     p = plotList[[plotN[[i]]]]
-    png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".png", sep = ""), height = 600, width = 650)
+    png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".png", sep = ""), height = 400, width = 500)
     print(plot_grid(p, plotLeg, ncol = 2, rel_widths = c(1,0.3)))
     dev.off()
   }
