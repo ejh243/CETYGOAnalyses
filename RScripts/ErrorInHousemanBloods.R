@@ -47,7 +47,7 @@ betas = y
 phenoTrain = c(rep("Test", length(phenoDat)))
 for(i in 1:length(levels(phenoDat))){
   cellTypeIndex = which(phenoDat == levels(phenoDat)[i])
-  set.seed(123)
+  set.seed(125)
   phenoTrain[sample(cellTypeIndex, length(cellTypeIndex)-1)] = "Train"
 }
 
@@ -133,120 +133,45 @@ plot_grid(plotsnoLeg,
           rel_heights = c(2, 0.1))
 dev.off()
 
-# ## full PCA to show celltype similarity
-# betaVar = apply(betas, 1, var, na.rm = T)
-# topBeta = betas[order(betaVar, decreasing = T)[1:1000],]
-# plotDatPCAFULL = autoplot(prcomp(t(topBeta)), data = pheno, col = "celltype", shape = "celltype", size = 2) +
-#   theme_cowplot(18)
-# 
-# pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellPCA.pdf",height = 7, width = 7)
-# plotDatPCAFULL +
-#   labs(col = "Cell type", shape = "Cell type")
-# dev.off()
+## full PCA to show celltype similarity
+betaVar = apply(betas, 1, var, na.rm = T)
+topBeta = betas[order(betaVar, decreasing = T)[1:1000],]
+plotDatPCAFULL = autoplot(prcomp(t(topBeta)), data = pheno, col = "celltype", shape = "trainTest", size = 2) +
+  scale_shape_manual(values = c(21, 19)) +
+  labs(col = "Cell type", shape = "") +
+  theme_cowplot(18)
 
+png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellPCA.png",height = 450, width = 500)
+plotDatPCAFULL 
+dev.off()
 
-### Check effect of normalisation #####################
-# ## load normalised data 
-# load("/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
-# load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
-# 
-# ## source model functions
-# source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
-# source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
-# source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
-# 
-# ## create model in separately normalised train data
-# unnormalisedModel = pickCompProbes(rawbetas = betasTrain,
-#                                    cellTypes = levels(as.factor(phenoTrain$celltype)),
-#                                    cellInd = as.factor(phenoTrain$celltype),
-#                                    numProbes =  50,
-#                                    probeSelect = "auto")
-# 
-# ## create model in separately normalised train data
-# sepNormalisedModel = pickCompProbes(rawbetas = quantileBetasTrain,
-#                                     cellTypes = levels(as.factor(phenoTrain$celltype)),
-#                                     cellInd = as.factor(phenoTrain$celltype),
-#                                     numProbes =  50,
-#                                     probeSelect = "auto")
-# 
-# ## create model in combined normalised train data
-# combNormalisedModel = pickCompProbes(rawbetas = quantileBetas[, pheno$trainTest == "Train"],
-#                                      cellTypes = levels(as.factor(phenoTrain$celltype)),
-#                                      cellInd = as.factor(phenoTrain$celltype),
-#                                      numProbes =  50,
-#                                      probeSelect = "auto")
-# 
-# ## apply models to their respective test data sets
-# unnormalisedPrediction = projectCellTypeWithError(betasTest, model = "ownModel", ownModelData = unnormalisedModel)
-# sepNormalisedPrediction = projectCellTypeWithError(quantileBetasTest, model = "ownModel", ownModelData = sepNormalisedModel)
-# combNormalisedPrediction = projectCellTypeWithError(quantileBetas[, pheno$trainTest == "Test"], model = "ownModel", ownModelData = combNormalisedModel)
-# unModNormDatPrediction = projectCellTypeWithError(quantileBetasTest, model = "ownModel", ownModelData = unnormalisedModel)
-# normModUnDatPrediction = projectCellTypeWithError(betasTest, model = "ownModel", ownModelData = sepNormalisedModel)
-# trueProp = singleCellProportionMatrix(phenoTest[,1])
-# 
-# library(ggplot2)
-# library(cowplot)
-# library(reshape2)
-# 
-# # get absolute difference in predictions
-# unnormMelt = melt(unnormalisedPrediction[,-which(colnames(unnormalisedPrediction) %in% c("nCGmissing", "error"))])
-# sepMelt = melt(sepNormalisedPrediction[,-which(colnames(sepNormalisedPrediction) %in% c("nCGmissing", "error"))])
-# combMelt = melt(combNormalisedPrediction[,-which(colnames(combNormalisedPrediction) %in% c("nCGmissing", "error"))])
-# unModNormDatMelt = melt(unModNormDatPrediction[,-which(colnames(unModNormDatPrediction) %in% c("nCGmissing", "error"))])
-# normModUnDatMelt = melt(normModUnDatPrediction[,-which(colnames(normModUnDatPrediction) %in% c("nCGmissing", "error"))])
-# 
-# absDiffUn = abs(unnormMelt[,3] - melt(trueProp)[,3])
-# absDiffSep = abs(sepMelt[,3] - melt(trueProp)[,3])
-# absDiffComb = abs(combMelt[,3] - melt(trueProp)[,3])
-# absDiffunModNormDat = abs(unModNormDatMelt[,3] - melt(trueProp)[,3])
-# absDiffnormModUnDat = abs(normModUnDatMelt[,3] - melt(trueProp)[,3])
-# 
-# 
-# plotDat = data.frame(diff = c(absDiffUn, absDiffComb, absDiffSep, absDiffunModNormDat, absDiffnormModUnDat), 
-#                      norm = rep(c("UU", "N", "NN", "UN", "NU"), each = length(absDiffComb)),
-#                      cell = as.factor(c(as.character(unnormMelt[,2]), as.character(sepMelt[,2]), as.character(combMelt[,2]), as.character(sepMelt[,2]), as.character(sepMelt[,2]))))
-# 
-# ## use a paired t-test to compare each group to comb, the default
-# dat = cbind(absDiffUn, absDiffComb, absDiffSep, absDiffunModNormDat, absDiffnormModUnDat)
-# library(xtable)
-# xtable(rbind.data.frame(t.testMatrix(dat), mean = signif(colMeans(dat),3), 
-#                         SD = signif(apply(dat, 2, sd),3)))
-# 
-# pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/sepCombNormalisationComparison.pdf", 
-#     height = 5, width = 8)
-# ggplot(plotDat, aes(x = norm, y = diff)) +
-#   geom_violin() +
-#   geom_jitter(aes(col = cell, shape = cell)) +
-#   theme_cowplot(18) +
-#   labs(x = "Normalisation", y = "Absolute difference between true and\npredicted cell type proportions") +
-#   theme(legend.title = element_blank())
-# dev.off()
 
 
 
 ### Optimise number of CpGs ###########################
-# ## load unnormalised data 
-# load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
-# 
-# ## source model functions
-# source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
-# source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
-# source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
-# 
-# # ## make models
-# # modelListCpG = list()
-# # cpg = c(1:25,seq(30,55,5), seq(60, 100, 10))
-# # for (i in 1:length(cpg)) {
-# #   modelListCpG[[i]] = pickCompProbes(rawbetas = as.matrix(betasTrain),
-# #                                      cellTypes = levels(as.factor(phenoTrain$celltype)),
-# #                                      cellInd = as.factor(phenoTrain$celltype),
-# #                                      numProbes =  cpg[i],
-# #                                      probeSelect = "auto")
-# #   names(modelListCpG)[i] = paste("model", cpg[i], "CG", sep = "")
-# # }
-# # 
-# # ## save model list
-# # save(modelListCpG, file = "/mnt/data1/Thea/ErrorMetric/data/nCpGModels/nCpGModels.Rdata")
+## load unnormalised data
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+
+## source model functions
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+## make models
+modelListCpG = list()
+# cpg = c(1:25,seq(30,55,5), seq(60, 100, 10))
+cpg = 50
+for (i in 1:length(cpg)) {
+  modelListCpG[[i]] = pickCompProbes(rawbetas = as.matrix(betasTrain),
+                                     cellTypes = levels(as.factor(phenoTrain$celltype)),
+                                     cellInd = as.factor(phenoTrain$celltype),
+                                     numProbes =  cpg[i],
+                                     probeSelect = "auto")
+  names(modelListCpG)[i] = paste("model", cpg[i], "CG", sep = "")
+}
+#
+# ## save model list
+# save(modelListCpG, file = "/mnt/data1/Thea/ErrorMetric/data/nCpGModels/nCpGModels.Rdata")
 # 
 # load("/mnt/data1/Thea/ErrorMetric/data/nCpGModels/nCpGModels.Rdata")
 # library(reshape2)
@@ -278,14 +203,113 @@ dev.off()
 # ggplot(corPlot, aes(x = cpg, y = rmseTvP)) +
 #   geom_point() +
 #   theme_cowplot(18) +
-#   labs(x = expression(paste(italic("numProbes"))), 
+#   labs(x = expression(paste(italic("numProbes"))),
 #                       y = "Absolute difference between true and\npredicted cell type proportions")
 # dev.off()
-# 
-# ## save model that used 50 CpGs
-# HousemanBlood50CpGModel = modelListCpG[[which(cpg == 50)]]
-# save(HousemanBlood50CpGModel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
 
+## save model that used 50 CpGs
+HousemanBlood50CpGModel = modelListCpG[[which(cpg == 50)]]
+save(HousemanBlood50CpGModel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+
+
+
+### Check effect of normalisation #####################
+
+## load normalised Erisk for the phenofile then merge it
+library(bigmelon)
+library(gdsfmt)
+load("/mnt/data1/Eilis/Projects/Asthma/QC/CombinedQC_WithMarkdown/AllmsetEPIC.rdat")
+EriskGDS = es2gds(msetEPIC, file = "/mnt/data1/Thea/ErrorMetric/data/gds/ERISK.gds")
+# EriskGDS = openfn.gds("/mnt/data1/Thea/ErrorMetric/data/gds/ERISK.gds")
+
+Basename = pData(EriskGDS)$barcode
+
+EriskBetas = betas(EriskGDS)
+
+pheno = read.csv("/mnt/data1/Eilis/Projects/Asthma/QC/CombinedQC_WithMarkdown/CellSortedAsthmaERisk_SamplesPassedQC.csv")
+
+EriskBetas = EriskBetas[,which(Basename %in% pheno$Basename)]
+sum(colnames(EriskBetas ) == pheno$Basename)
+
+## predict cell proportions using my method
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+
+predOwn = projectCellTypeWithError(EriskBetas, "ownModel", HousemanBlood50CpGModel)
+
+
+## predict using watermelon
+source("/mnt/data1/Thea/wateRmelon/wateRmelon/R/estimateCellCounts.R")
+predWater = estimateCellCounts.wmln(msetEPIC, platform = "EPIC")
+
+predWater = predWater[which(rownames(predWater) %in% rownames(predOwn)),]
+
+rm(list = setdiff(ls(),c("pheno", "predOwn","predWater")))
+pheno = read.csv("/mnt/data1/Eilis/Projects/Asthma/QC/CombinedQC_WithMarkdown/CellSortedAsthmaERisk_SamplesPassedQC.csv")
+
+library(reshape2)
+Minfi = melt(pheno[,c("Basename", "Bcell","CD8T", "CD4T","Gran", "Mono","NK")], id.vars = "Basename")
+WateR = melt(cbind.data.frame(Basename = rownames(predWater), predWater), id.vars = "Basename")
+Own = melt(cbind.data.frame(Basename = rownames(predOwn), predOwn), id.vars = c("Basename","error","nCGmissing"))
+
+names(Minfi)[names(Minfi) =="value"] = "minfiPred"
+names(WateR)[names(WateR) =="value"] = "wateRPred"
+names(Own)[names(Own) =="value"] = "OwnPred"
+
+plotDat = merge(merge(Minfi, WateR, by = c("Basename", "variable")), Own, by = c("Basename", "variable"))
+
+library(ggplot2)
+library(cowplot)
+library(scales)
+library(viridis)
+
+colSub = hue_pal()(6)
+
+p1 = ggplot(plotDat, aes(x = OwnPred, y = minfiPred, col = error)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  geom_point() +
+  scale_color_viridis() +
+  theme_cowplot(18) +
+  labs(x = "Own prediction", y = "minfi prediction", col = "Cetygo")
+
+p2 = ggplot(plotDat, aes(x = OwnPred, y = wateRPred, col = error)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  geom_point() +
+  scale_color_viridis() +
+  theme_cowplot(18) +
+  labs(x = "Own prediction", y = "WateRmelon prediction", col = "Cetygo")
+
+p3 = ggplot(plotDat, aes(x = minfiPred, y = wateRPred, col = error)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  geom_point() +
+  theme_cowplot(18) +
+  scale_color_viridis() +
+  labs(x = "minfi prediction", y = "WateRmelon prediction", col = "Cetygo")
+
+p4 = get_legend(p1 )#+ theme(legend.direction =  "horizontal",
+                     #      legend.justification="center"))
+                  
+p5 = plot_grid(p1+theme(legend.position = "none"),
+               p2+theme(legend.position = "none"),
+               labels = c("A","B"),
+               ncol = 2)
+
+p6 = plot_grid(NULL,p3+theme(legend.position = "none"),p4,NULL,
+               ncol = 4,
+               labels = c("","C","",""), rel_widths = c(0.4,1,0.2,0.4))
+
+plot_grid(p1+theme(legend.position = "none"),
+          p2+theme(legend.position = "none"),
+          p3+theme(legend.position = "none"),
+          p4,labels = c("A","B","C",""),
+          ncol = 4, rel_widths = c(1,1,1,0.2))
+
+png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/WatermelonMinfiOwnNormComparison.png", height = 550, width = 550)
+  plot_grid(p5,p6,ncol = 1)
+dev.off()
+
+## FROM HERE FOR REMAKING PLOTS ####
 
 
 ### Plot heirarchical cluster of training cpgs used in model #####
@@ -1659,8 +1683,9 @@ plotDat$Purity = factor(ifelse(plotDat$Max == 1, "100%",
 library(ggplot2)
 library(cowplot)
 
-
+pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/PurityOfSampleCetygo.pdf", height = 5, width = 6)
 ggplot(plotDat, aes(x = Purity, y = Cetygo)) +
   geom_violin() +
   theme_cowplot(18) +
   labs(x = "Maximum cellular proportion\nat any cell type")
+dev.off()
