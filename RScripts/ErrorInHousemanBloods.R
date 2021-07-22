@@ -48,7 +48,7 @@ phenoTrain = c(rep("Test", length(phenoDat)))
 for(i in 1:length(levels(phenoDat))){
   cellTypeIndex = which(phenoDat == levels(phenoDat)[i])
   set.seed(123)
-  phenoTrain[sample(cellTypeIndex, ceiling(length(cellTypeIndex)/2))] = "Train"
+  phenoTrain[sample(cellTypeIndex, length(cellTypeIndex)-1)] = "Train"
 }
 
 
@@ -70,23 +70,23 @@ save(betas, betasTrain, betasTest, pheno, phenoTrain, phenoTest,
      file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
 
 
-## quantile normalise together and apart
-load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestRGSet.Rdata")
-quantileBetasTrain = getBeta(preprocessQuantile(betasTrain, fixOutliers = TRUE,
-                                                removeBadSamples = TRUE, badSampleCutoff = 10.5,
-                                                quantileNormalize = TRUE, stratified = TRUE, 
-                                                mergeManifest = FALSE, sex = NULL))
-quantileBetasTest = getBeta(preprocessQuantile(betasTest, fixOutliers = TRUE,
-                                               removeBadSamples = TRUE, badSampleCutoff = 10.5,
-                                               quantileNormalize = TRUE, stratified = TRUE, 
-                                               mergeManifest = FALSE, sex = NULL))
-quantileBetas = getBeta(preprocessQuantile(betas, fixOutliers = TRUE,
-                                           removeBadSamples = TRUE, badSampleCutoff = 10.5,
-                                           quantileNormalize = TRUE, stratified = TRUE, 
-                                           mergeManifest = FALSE, sex = NULL))
-## save data
-save(quantileBetasTrain, quantileBetasTest, quantileBetas, phenoTest, phenoTrain, pheno,
-     file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
+# ## quantile normalise together and apart
+# load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestRGSet.Rdata")
+# quantileBetasTrain = getBeta(preprocessQuantile(betasTrain, fixOutliers = TRUE,
+#                                                 removeBadSamples = TRUE, badSampleCutoff = 10.5,
+#                                                 quantileNormalize = TRUE, stratified = TRUE, 
+#                                                 mergeManifest = FALSE, sex = NULL))
+# quantileBetasTest = getBeta(preprocessQuantile(betasTest, fixOutliers = TRUE,
+#                                                removeBadSamples = TRUE, badSampleCutoff = 10.5,
+#                                                quantileNormalize = TRUE, stratified = TRUE, 
+#                                                mergeManifest = FALSE, sex = NULL))
+# quantileBetas = getBeta(preprocessQuantile(betas, fixOutliers = TRUE,
+#                                            removeBadSamples = TRUE, badSampleCutoff = 10.5,
+#                                            quantileNormalize = TRUE, stratified = TRUE, 
+#                                            mergeManifest = FALSE, sex = NULL))
+# ## save data
+# save(quantileBetasTrain, quantileBetasTest, quantileBetas, phenoTest, phenoTrain, pheno,
+#      file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
 
 
 ### plot PCA of betas per cell type coloured by train test ######
@@ -282,7 +282,7 @@ dev.off()
 #                       y = "Absolute difference between true and\npredicted cell type proportions")
 # dev.off()
 # 
-# ## save model that used 150 CpGs
+# ## save model that used 50 CpGs
 # HousemanBlood50CpGModel = modelListCpG[[which(cpg == 50)]]
 # save(HousemanBlood50CpGModel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
 
@@ -1626,3 +1626,41 @@ p2 = ggplot(pred, aes(x = U, y = error)) +
 png("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/CetygoAndIntensityBloodPPMI.png", height = 600, width = 500)
 plot_grid(p1,p2, ncol = 1, labels = "AUTO")
 dev.off()
+
+
+#### calculate n cell types needed for model and plot ####
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+rm(betasTrain, betasTest, phenoTest, phenoTrain)
+plot = nCellsNeededForDeconvolution(betas, phenoCell = pheno$celltype)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/nTrainingDataIndividualsNeeded.pdf", height = 5, width = 6)
+plot
+dev.off()
+
+#### Which is easier to deconvolute, bulk or purified? ####
+## rerun when model rerun train and test first
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+rm(betas, betasTrain, pheno, phenoTrain)
+simData = simPropMaker3(model = HousemanBlood50CpGModel, testBetas = betasTest, pheno = phenoTest$celltype)
+  
+## predict proportions with Cetygo
+pred = projectCellTypeWithError(simData[[1]], modelType = "ownModel", ownModelData = HousemanBlood50CpGModel)
+
+plotDat = cbind.data.frame(Cetygo = pred[,"error"], Max = apply(simData[[2]],1,max))
+
+plotDat$Purity = factor(ifelse(plotDat$Max == 1, "100%", 
+                        ifelse(plotDat$Max == 0.75, "75%",
+                               ifelse(plotDat$Max == 0.5, "50%", "25%"))), 
+                        levels = c("100%", "75%", "50%", "25%"))
+
+library(ggplot2)
+library(cowplot)
+
+
+ggplot(plotDat, aes(x = Purity, y = Cetygo)) +
+  geom_violin() +
+  theme_cowplot(18) +
+  labs(x = "Maximum cellular proportion\nat any cell type")

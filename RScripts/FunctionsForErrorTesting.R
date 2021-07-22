@@ -785,6 +785,44 @@ t.testMatrix = function(dat, pair = T, altVal = "two.sided", LaTex = F){
   return(xtable(outmat))
 }
 
+#### simPropMaker3 ####
+## this one does 0.25 of each cell type where they sum to 1
+## takes one or more samples and takes their mean
+
+# testBetas = testB[,]
+# x = modMatProp[22,]
+# pheno = testP
+
+# simulates 126 samples for blood, returns list of simBetas and proportions per cell type
+
+simPropMaker3 = function(model, testBetas, pheno){
+  
+  testBetas = GetModelCG(betas = testBetas, model = list(model))
+  
+  # if there's more than 1 test sample per cell type, take the row mean per cell type
+  if(length(levels(pheno)) != ncol(testBetas)){ 
+    
+    temp = matrix(nrow = nrow(testBetas), ncol = length(levels(pheno)))
+    for(i in 1:length(levels(pheno))){
+      temp[,i] = apply(testBetas[,which(pheno == levels(pheno)[i])], 1, mean)
+      
+    }
+    colnames(temp) = levels(pheno)
+    rownames(temp) = rownames(testBetas)
+    testBetas = temp
+    pheno = levels(pheno)
+  } 
+  
+  
+  modMatProp = as.matrix(expand.grid(lapply(numeric(length(levels(pheno))), function(x) seq(0,1,0.25))))
+  modMatProp = modMatProp[rowSums(modMatProp)==1, ]
+  colnames(modMatProp) = pheno
+  
+  
+  simBetas = apply(modMatProp,1,function(x){rowSums(t(x*t(testBetas)))})
+  
+  return(list(simBetas, modMatProp))
+}
 
 
 ### nCellsNeededForDeconvolution ######################
@@ -798,12 +836,12 @@ source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
 source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
 
 ## testing data
-load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
-rm(betasTrain, betasTest, phenoTest, phenoTrain)
-
-phenoCell = pheno$celltype
-
-modMatRow = modMat[1,]
+# load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+# rm(betasTrain, betasTest, phenoTest, phenoTrain)
+# 
+# phenoCell = pheno$celltype
+# 
+# modMatRow = modMat[22,]
 
 nCellsNeededForDeconvolution = function(betas, phenoCell){
   
@@ -812,7 +850,7 @@ nCellsNeededForDeconvolution = function(betas, phenoCell){
   
   # matrix of possible inclusions of individual
   modMat = as.matrix(expand.grid(lapply(numeric(nPerCelltype), function(x) c(T, F))))
-  modMat = modMat[rowSums(modMat)>1 &rowSums(modMat) <6, ]
+  modMat = modMat[rowSums(modMat)>1 & rowSums(modMat)<6, ]
   
   
   createAndApplyRBDM = function(modMatRow){
@@ -835,23 +873,36 @@ nCellsNeededForDeconvolution = function(betas, phenoCell){
                            probeSelect = "auto")
     
     ## create testing data using simulation framework
-
+    simList = simPropMaker3(model, testBetas = testB, pheno = testP)
     
+    ## predict proportions of simulated data
+    pred = projectCellTypeWithError(simList[[1]], modelType = "ownModel", ownModelData = model)
     
+    ## calculate RMSE of predicted vs actual
+    RMSE = function(m, o){
+      sqrt(mean((m - o)^2))
+    }
+    
+    ## melt the data
+    library(reshape2)
+    accuracy = RMSE(melt(simList[[2]])[,"value"], melt(pred[1:length(celltypes)])[,"value"])
+    
+    return(accuracy)
   }
   
+  accAcrossMod = apply(modMat, 1, createAndApplyRBDM)
+  
+  plotDat = cbind.data.frame(trainN = as.factor(rowSums(modMat)), RMSE = accAcrossMod)
+  
+  library(ggplot2)
+  library(cowplot)
+  
+  print(
+  ggplot(plotDat, aes(x = trainN, y = RMSE)) +
+    geom_violin() +
+    theme_cowplot(18) +
+    labs(x = "Number of individuals in the training data", y = "RMSE between predicted and\nactual cell type proportions")
+  )
   
 }
 
-
-simPropMaker3 = function(model){
-  
-  
-  modMat = as.matrix(expand.grid(lapply(numeric(nPerCelltype), function(x) seq(0,1,0.25))))
-  modMat = modMat[rowSums(modMat)==1, ]
-  
-  
-  
-  simBetas = sapply(modMat,1,function(x){colSums(t(x*t(model$coefEsts)))})
-  
-}
