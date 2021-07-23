@@ -795,9 +795,12 @@ t.testMatrix = function(dat, pair = T, altVal = "two.sided", LaTex = F){
 
 # simulates 126 samples for blood, returns list of simBetas and proportions per cell type
 
-simPropMaker3 = function(model, testBetas, pheno){
+simPropMaker3 = function(model, testBetas, pheno, modelList = F){
   
-  testBetas = GetModelCG(betas = testBetas, model = list(model))
+  # model already a list?
+  if(modelList){
+    testBetas = GetModelCG(betas = testBetas, model = model)
+  }else{testBetas = GetModelCG(betas = testBetas, model = list(model))}
   
   # if there's more than 1 test sample per cell type, take the row mean per cell type
   if(length(levels(pheno)) != ncol(testBetas)){ 

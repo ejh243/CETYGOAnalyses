@@ -89,7 +89,7 @@ save(betas, betasTrain, betasTest, pheno, phenoTrain, phenoTest,
 #      file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
 
 
-### plot PCA of betas per cell type coloured by train test ######
+### plot PCA of betas per cell type coloured by train test and heirarchical cluster ######
 load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
 library(ggfortify)
 library(ggplot2)
@@ -288,8 +288,8 @@ p3 = ggplot(plotDat, aes(x = minfiPred, y = wateRPred, col = error)) +
   labs(x = "minfi prediction", y = "WateRmelon prediction", col = "Cetygo")
 
 p4 = get_legend(p1 )#+ theme(legend.direction =  "horizontal",
-                     #      legend.justification="center"))
-                  
+#      legend.justification="center"))
+
 p5 = plot_grid(p1+theme(legend.position = "none"),
                p2+theme(legend.position = "none"),
                labels = c("A","B"),
@@ -306,7 +306,7 @@ plot_grid(p1+theme(legend.position = "none"),
           ncol = 4, rel_widths = c(1,1,1,0.2))
 
 png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/WatermelonMinfiOwnNormComparison.png", height = 550, width = 550)
-  plot_grid(p5,p6,ncol = 1)
+plot_grid(p5,p6,ncol = 1)
 dev.off()
 
 ## FROM HERE FOR REMAKING PLOTS ####
@@ -342,25 +342,25 @@ Heatmap(modelBetas, name = "DNAm",
         top_annotation = ha, show_row_names = F, show_column_names = F, show_row_dend = F)
 dev.off()
 
-### plot PCA of model CpGs ############################
-## full PCA to show celltype similarity
-load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
-
-library(ggfortify)
-library(ggplot2)
-library(cowplot)
-library(scales)
-
-pheno = data.frame(celltype = colnames(HousemanBlood50CpGModel$coefEsts))
-plotDatPCAFULL = autoplot(prcomp(t(HousemanBlood50CpGModel$coefEsts)), 
-                          data = pheno, col = "celltype", shape = "celltype", size = 3) +
-  theme_cowplot(18)
-
-# pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.pdf",height = 6, width = 6)
-png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.png",height = 500, width = 550)
-plotDatPCAFULL +
-  labs(col = "Cell type", shape = "Cell type")
-dev.off()
+# ### plot PCA of model CpGs ############################
+# ## full PCA to show celltype similarity
+# load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+# 
+# library(ggfortify)
+# library(ggplot2)
+# library(cowplot)
+# library(scales)
+# 
+# pheno = data.frame(celltype = colnames(HousemanBlood50CpGModel$coefEsts))
+# plotDatPCAFULL = autoplot(prcomp(t(HousemanBlood50CpGModel$coefEsts)), 
+#                           data = pheno, col = "celltype", shape = "celltype", size = 3) +
+#   theme_cowplot(18)
+# 
+# # pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.pdf",height = 6, width = 6)
+# png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.png",height = 500, width = 550)
+# plotDatPCAFULL +
+#   labs(col = "Cell type", shape = "Cell type")
+# dev.off()
 
 
 ### Create models using 3:6 cell types ################
@@ -391,80 +391,103 @@ cellTypeShorthand = c("B", "C4", "C8", "G", "M", "NK")
 # }
 # 
 # save(modelList, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
-# 
-# load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
-# 
+
+load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+
 # ## mean proportions of each cell type in whole blood (from Reinius2012)
 # meanBloodProp = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43)
 # sdBloodProp = c(1.44, 3.12, 3.13, 9.19, 3.17, 1.5)
 # 
 # # each cell type will be simulated with mean, mean +- sd, mean +- 2sd
-# 
+
+## simulate data in stratified way
+bulk = simPropMaker3(model = modelList, testBetas = betasTest, pheno = phenoTest$celltype, modelList = T)
+
+
 # bulk = CellTypeProportionSimulator(GetModelCG(betasTest, modelList),
 #                             phenoTest,
 #                             phenoColName = "celltype",
 #                             nBulk = 30,
 #                             proportionsMatrixType = "own",
 #                             proportionsMatrix = simPropMaker(meanBloodProp, sdBloodProp))
-# 
+
 # stackedPlots = ModelCompareStackedBar(bulk[[1]],
 #                            modelList,
 #                            nCpGPlot = F,
 #                            sampleNamesOnPlots = F,
 #                            trueComparison = T,
 #                            trueProportions = bulk[[2]])
-# 
+
+predBulk = list()
+for (i in 1:length(modelList)){
+  predBulk[[i]] = projectCellTypeWithError(bulk[[1]], modelType = "ownModel", ownModelData = modelList[[i]])
+}
+
+
 # save(modelList, bulk, stackedPlots, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+save(modelList, bulk, predBulk, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
 
 
 load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
 
-x = stackedPlots[[1]]$data
+plotDat = as.data.frame(matrix(nrow = 0, ncol = 3))
+for (i in 1:length(modelList)){
+  plotDat = rbind.data.frame(plotDat, cbind.data.frame(1:126, predBulk[[i]][,"error"], names(modelList)[i]))
+}
+colnames(plotDat) = c("Sample", "Cetygo", "Model")
+
+
 
 ## add columns for which cell types in each data set and then compare specific models
-modelPresent = matrix(ncol = length(cellTypes), nrow = nrow(x), data = 0)
+modelPresent = matrix(ncol = length(cellTypes), nrow = 42, data = 0)
 colnames(modelPresent) = paste(cellTypeShorthand, "cell")
 
 
 for(i in 1:6){
-  modelPresent[grep(cellTypeShorthand[i],x$model),i] = 1
+  modelPresent[grep(cellTypeShorthand[i],names(modelList)),i] = 1
 }
 
 y = rowSums(modelPresent)
-plotDat = data.frame(x,modelPresent, sums = y)
+x = cbind.data.frame(nCelltypes = y, Model = names(modelList))
 
-## colour by number of cells in model
-plotDatBox = spread(plotDat, key = c(cellType), value = c(proportion_pred))
+plotDat = merge(plotDat, x, by = "Model")
 
-## no stats comparison for any with simulated data as n is decided by me
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/badModels/violinnCelltypeModels.pdf", height = 6, width = 6)
-ggplot(plotDatBox, aes(x = as.factor(sums), y = error, fill = as.factor(sums))) +
+ggplot(plotDat, aes(x = as.factor(nCelltypes), y = Cetygo)) +
   geom_violin() +
   theme_cowplot(18) +
   labs(x = "Number of cell types in the model", y = "Cetygo") +
-  ylim(c(0, max(plotDatBox$error))) +
+  ylim(c(0, max(plotDat$Cetygo))) +
   theme(legend.position = "none") 
 dev.off() 
+
+
 
 
 ## general Q: 
 ## why do some still predict well? low proportion of that cell type? cell type less important?
 
 ## compare those with only 5 to simplify the question
-plotDat5 = plotDatBox[plotDatBox$sums == 5, ]
-plotDat5$mod = factor(unlist(strsplit(as.character(plotDat5$model), "l_"))[seq(2,nrow(plotDat5)*2,2)],
-                         levels = c("C4C8GMNK", "BC8GMNK", "BC4GMNK", "BC4C8MNK", "BC4C8GNK", "BC4C8GM"))
+plotDat5 = plotDat[plotDat$nCelltypes == 5, ]
+plotDat5$mod = factor(unlist(strsplit(as.character(plotDat5$Model), "l_"))[seq(2,nrow(plotDat5)*2,2)],
+                      levels = c("C4C8GMNK", "BC8GMNK", "BC4GMNK", "BC4C8MNK", "BC4C8GNK", "BC4C8GM"))
 
+
+plotDat5$cMissing = revalue(plotDat5$mod, c("C4C8GMNK" = "Bcell",
+                                            "BC8GMNK" = "CD4T", 
+                                            "BC4GMNK" = "CD8T", 
+                                            "BC4C8MNK" = "Gran", 
+                                            "BC4C8GNK" = "Mono",
+                                            "BC4C8GM" = "NK"))
 
 ## violin plot of 5 cell types only
 pdf("/mnt/data1/Thea/ErrorMetric/plots/badModels/violin5CelltypeModels.pdf", height = 6, width = 6)
-ggplot(plotDat5, aes(x = mod, y = error, fill = mod)) +
+ggplot(plotDat5, aes(x = cMissing, y = Cetygo, fill = cMissing)) +
   geom_violin() +
   theme_cowplot(18) +
-  labs(x = "Model", y = "Cetygo") +
-  ylim(c(0, max(plotDat5$error))) +
-  scale_x_discrete(limits = c("C4C8GMNK", "BC8GMNK", "BC4GMNK", "BC4C8MNK", "BC4C8GNK", "BC4C8GM")) +
+  labs(x = "Missing cell type in model", y = "Cetygo") +
+  ylim(c(0, max(plotDat5$Cetygo))) +
   theme(legend.position = "none", 
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
 dev.off()
@@ -473,7 +496,8 @@ dev.off()
 model5Index = which(rowSums(designMatrix) == 5)
 models5 = modelList[model5Index]
 
-wantedModelNames = sapply(strsplit(names(models5), "_"), function(x){return(x[[2]])})
+wantedModelNames = c("Bcell missing", "CD4T missing", "CD8T missing",
+                     "Gran missing", "Mono missing", "NK missing")
 names(models5) = wantedModelNames
 
 ## for each cell type, plot stacked bar of true and actual and error for their own simulated data 
@@ -482,8 +506,10 @@ models5Compared = list()
 for (i in 1:6){
   celltypePreBool = 1:6
   bulkProp = simPropMaker2(meanBloodProp, celltypeBool = celltypePreBool == i, cellNames = cellTypes)
-  bulk = CellTypeProportionSimulator(GetModelCG(betasTest, list(models5[[i]])),
-                                     phenoTest,
+  
+  #pretend there are two cell purified samples in test or function breaks
+  bulk = CellTypeProportionSimulator(GetModelCG(cbind(betasTest,betasTest), list(models5[[i]])),
+                                     rbind.data.frame(phenoTest, phenoTest),
                                      phenoColName = "celltype",
                                      nBulk = nrow(bulkProp),
                                      proportionsMatrixType = "own",
@@ -496,17 +522,48 @@ for (i in 1:6){
                                                 noise = F,
                                                 trueProportions = bulk[[2]],
                                                 nCpGPlot = F,
-                                                sampleNamesOnPlots = F)
+                                                sampleNamesOnPlots = T)
 }
 
 for(i in 1:6){
   leg = get_legend(models5Compared[[i]][[3]]
                    + theme(legend.justification = "centre",legend.direction = "horizontal", legend.title = element_blank())
                    + guides(fill = guide_legend(nrow = 1)))
-  plots = plot_grid(models5Compared[[i]][[1]] + theme(legend.position = "none"),
-                    models5Compared[[i]][[2]] + theme(legend.position = "none"),
-                    models5Compared[[i]][[3]] + theme(legend.position = "none"), ncol = 1,
-                    rel_heights = c(0.6,1,1), labels = "AUTO", axis = "rl", align = "v" )
+  plots = plot_grid(models5Compared[[i]][[1]] + 
+              theme(legend.position = "none", 
+                    axis.title.x=element_blank(),
+                    axis.text.x=element_blank(),
+                    axis.ticks.x=element_blank()) +
+              xlab(element_blank()),
+            models5Compared[[i]][[2]] + 
+              theme(legend.position = "none",
+                    axis.title.x=element_blank(),
+                    axis.text.x=element_blank(),
+                    axis.ticks.x=element_blank()) +
+              xlab(element_blank()),
+            models5Compared[[i]][[3]] + 
+              theme(legend.position = "none", 
+                    axis.text.x = element_text(angle = 0, vjust = 0, hjust=0.5))+
+              scale_x_discrete(labels = c("Sa" = "0.1",
+                                          "Sb" = "0.2",
+                                          "Sc" = "0.3",
+                                          "Sd" = "0.4",
+                                          "Se" = "0.5",
+                                          "Sf" = "0.6",
+                                          "Sg" = "0.7",
+                                          "Sh" = "0.8",
+                                          "Si" = "0.9",
+                                          "Sj" = "1.0"))+
+              xlab(paste("Simulated proportion of", strsplit(wantedModelNames[i], " ")[[1]][1])),
+            ncol = 1,
+            rel_heights = c(0.6,1,1.2), labels = "AUTO", axis = "rl", align = "v" )
+  
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+  
+  
   # pdf(paste("/mnt/data1/Thea/ErrorMetric/plots/badModels/stackedBar5cell",cellTypes[i],"missing.pdf", sep = ""), height = 9, width = 7)     
   png(paste("/mnt/data1/Thea/ErrorMetric/plots/badModels/stackedBar5cell",
             cellTypes[i],"missing.png", sep = ""), height = 800, width = 600)     
@@ -538,7 +595,7 @@ ggplot(erPlotDat, aes(x = sample, y = error, col = model)) +
                               "Sh" = "0.8",
                               "Si" = "0.9",
                               "Sj" = "1.0")) +
-  labs(x = "Proportion of missing cell type", y = "Cetygo", col = "Model") +
+  labs(x = "Simulated proportion of\nmissing cell type", y = "Cetygo", col = "Model") +
   ylim(c(0, max(erPlotDat$error)))
 dev.off()
 
@@ -566,8 +623,8 @@ colnames(meanBloodProp) = levels(phenoTest$celltype)
 noise = seq(0,0.95,0.05)
 
 ## create simulated samples with increasing noise
-testData = CellTypeProportionSimulator(betas = betasTest, 
-                                       pheno = phenoTest, 
+testData = CellTypeProportionSimulator(betas = cbind(betasTest,betasTest),
+                                       pheno = rbind.data.frame(phenoTest, phenoTest),
                                        phenoColName = "celltype", 
                                        nBulk = length(noise), 
                                        proportionsMatrixType = "own",
@@ -592,7 +649,7 @@ plots = plot_grid(stackedWithNoise[[1]] + theme(legend.position = "none"),
                   stackedWithNoise[[3]] + theme(legend.position = "none"), ncol = 1,
                   rel_heights = c(0.6,1,1), labels = "AUTO", axis = "rl", align = "v" )
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithNoise.pdf", height = 9, width = 7.5)     
+   
 png("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithNoise.png", height = 800, width = 600)     
 print(plot_grid(plots, leg, ncol = 1, rel_heights = c(1,0.08)))
 dev.off()
@@ -617,13 +674,13 @@ meanBloodProp = matrix(nrow = 1, byrow = T, data = c(3.01,13.4, 6.13, 64.9, 5.4,
 colnames(meanBloodProp) = levels(phenoTest$celltype)
 
 ## create a single representative sample
-testDataBlood = CellTypeProportionSimulator(betas = GetModelCG(betasTest, list(HousemanBlood50CpGModel)), 
-                                       pheno = phenoTest, 
-                                       phenoColName = "celltype", 
-                                       nBulk = 1, 
-                                       proportionsMatrixType = "own",
-                                       proportionsMatrix = meanBloodProp,
-                                       noiseIn = F)
+testDataBlood = CellTypeProportionSimulator(betas = GetModelCG(cbind(betasTest,betasTest), list(HousemanBlood50CpGModel)),
+                                            pheno = rbind.data.frame(phenoTest, phenoTest), 
+                                            phenoColName = "celltype", 
+                                            nBulk = 1, 
+                                            proportionsMatrixType = "own",
+                                            proportionsMatrix = meanBloodProp,
+                                            noiseIn = F)
 
 
 ## create function to add x NAs to betas
@@ -680,8 +737,8 @@ library(reshape2)
 pd = melt(plotDat, measure.vars = c("1","2","3","4","5","6","7","8","9","10"))
 
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithMissingCpGs.pdf", height = 4, width = 7) 
-ggplot(pd, aes(x = propMissing, y = value, fill = propMissing)) +
+pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithMissingCpGs.pdf", height = 4, width = 5.5) 
+ggplot(pd, aes(x = propMissing, y = value)) +
   geom_violin() +
   theme_cowplot(18) +
   scale_x_discrete(breaks=c(0, 0.25, 0.50, 0.75)) +
@@ -733,6 +790,8 @@ ggplot(allPheno, aes(x = data, y = error, fill = sex)) +
   labs(y = "Cetygo", x = "Dataset", fill = "Sex")
 dev.off()
 
+
+
 ## create age from 38 phenotype
 # allPheno$ageDiff = abs(as.numeric(as.character(allPheno$age))-38)
 
@@ -758,19 +817,23 @@ dev.off()
 
 ## Age of test data not available, only mean and SD, so plot those!
 
+library(scales)
+colToUse = hue_pal()(4)[c(2,4)]
+
 pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/ageAcrossEXandUS.pdf", height = 7, width = 7) 
 ggplot(allPheno, aes(x = as.numeric(as.character(age)), y = error, col = data)) +
   geom_point() +
   geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
   geom_vline(xintercept = c(38-13.6, 38+13.6), linetype = "dashed") +
   geom_vline(xintercept = 38) +
+  scale_color_manual(values = colToUse) +
   theme_cowplot(18) +
   labs(y = "Cetygo", x = "Age", col = "Dataset")
 dev.off()
 
-t.test(allPheno[allPheno$sex == "Female","error"], allPheno[allPheno$sex == "Male","error"], alternative = "greater")
+x = t.test(allPheno[allPheno$sex == "Female","error"], allPheno[allPheno$sex == "Male","error"], alternative = "greater")
 
-summary(lm(error ~ ageDiff, data = allPheno))
+# summary(lm(error ~ ageDiff, data = allPheno))
 
 
 ### check annotation of model CpGs to chromosomes #####
@@ -951,12 +1014,12 @@ dat$blood[dat$Tissue == "Blood" |
 ## merge bloods for plot
 dat$TissueBlood = dat$Tissue
 dat$TissueBlood[dat$Tissue == "Blood" |
-            dat$Tissue == "B Cells" |
-            dat$Tissue == "Granulocyes" |
-            dat$Tissue == "Neutrophils" |
-            dat$Tissue == "NK" |
-            dat$Tissue == "Lymph Node" |
-            dat$Tissue == "T Cells"] = "Blood"
+                  dat$Tissue == "B Cells" |
+                  dat$Tissue == "Granulocyes" |
+                  dat$Tissue == "Neutrophils" |
+                  dat$Tissue == "NK" |
+                  dat$Tissue == "Lymph Node" |
+                  dat$Tissue == "T Cells"] = "Blood"
 
 ## close gds 
 closefn.gds(gfile)
@@ -1081,16 +1144,16 @@ for(i in 1:length(levels(datB$Tissue))){
 }
 
 plotN = list(
-GSE110607 = c(1, 5, 9),
-GSE117050 = c(11),
-GSE89251 = c(22),
-GSE49618 = c(2, 13),
-GSE67170 = c(16),
-GSE71955 = c(17),
-GSE87095 = c(3),
-GSE87582 = c(20),
-GSE88824 = c(4, 7, 21))
-  
+  GSE110607 = c(1, 5, 9),
+  GSE117050 = c(11),
+  GSE89251 = c(22),
+  GSE49618 = c(2, 13),
+  GSE67170 = c(16),
+  GSE71955 = c(17),
+  GSE87095 = c(3),
+  GSE87582 = c(20),
+  GSE88824 = c(4, 7, 21))
+
 plotLeg = get_legend(cellTypeCompareStackedBar(
   datB[datB$Tissue == levels(datB$Tissue)[i],], BonlyForLeg = T))
 
@@ -1116,12 +1179,12 @@ for(i in 1:length(plotN)){
     dev.off()
   }
   if(length(plotN[[i]]) ==3){
-  p = plot_grid(plotList[[plotN[[i]][1]]] , plotList[[plotN[[i]][2]]], plotList[[plotN[[i]][3]]],
-                labels = "AUTO", ncol = 3)
-  png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".png", sep = ""), height = 400, width = 900)
-  print(plot_grid(p, plotLeg, ncol = 2, rel_widths = c(3,0.3)))
-  dev.off()
-}
+    p = plot_grid(plotList[[plotN[[i]][1]]] , plotList[[plotN[[i]][2]]], plotList[[plotN[[i]][3]]],
+                  labels = "AUTO", ncol = 3)
+    png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".png", sep = ""), height = 400, width = 900)
+    print(plot_grid(p, plotLeg, ncol = 2, rel_widths = c(3,0.3)))
+    dev.off()
+  }
 }
 
 
@@ -1375,7 +1438,7 @@ Pred$truePropWateR = Pred$Gran_WateR
 Pred$truePropWateR[Pred$Tissue == "B Cells"] = Pred$Bcell_WateR[Pred$Tissue == "B Cells"]
 Pred$truePropWateR[Pred$Tissue == "NK"] = Pred$NK_WateR[Pred$Tissue == "NK"]
 Pred$truePropWateR[Pred$Tissue == "T Cells"] = Pred$CD4T_WateR[Pred$Tissue == "T Cells"] +
-                                                Pred$CD8T_WateR[Pred$Tissue == "T Cells"]
+  Pred$CD8T_WateR[Pred$Tissue == "T Cells"]
 
 
 library(ggplot2)
@@ -1384,8 +1447,8 @@ library(viridis)
 library(plyr)
 
 Pred$Tissue = revalue(Pred$Tissue, c("B Cells" = "Bcell",
-                       "Granulocytes" = "Gran",
-                       "T Cells" = "Tcell" ))
+                                     "Granulocytes" = "Gran",
+                                     "T Cells" = "Tcell" ))
 
 # pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/MinfiVSMyPredForValidation.pdf", height = 7, width = 8)
 png("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/MinfiVSMyPredForValidation.png", height = 500, width = 600)
@@ -1501,7 +1564,7 @@ library(ComplexHeatmap)
 col = list(Celltype = c("Bcell" = "#F8766D", #"CD4T" = "#B79F00",
                         "CD8T" = "#00BA38",  #"Gran" = "#00BFC4",
                         "Mono" = "#619CFF"#,  "NK" = "#F564E3"
-                        ))
+))
 
 ha <- HeatmapAnnotation(Celltype = phenoTrain$celltype,
                         col = col)
@@ -1512,8 +1575,8 @@ Heatmap(model$coefEst, name = "DNAm",
 Heatmap(rowSums(model$coefEst)/3, cluster_rows = F, cluster_columns = F)
 
 Heatmap(apply(model$coefEst,1, function(x){x[1]*0.8 +
-                                        x[2]*0.1 +
-                                        x[3]*0.1 }), cluster_rows = F, cluster_columns = F)
+    x[2]*0.1 +
+    x[3]*0.1 }), cluster_rows = F, cluster_columns = F)
 
 
 Heatmap(apply(model$coefEst,1, function(x){x[1]*0.2 +
@@ -1625,8 +1688,8 @@ pred = as.data.frame(projectCellTypeWithError(betas, "ownModel", ownModelData = 
 
 pred$M = apply(M,2, median)
 pred$U = apply(U,2, median)
-  
-  
+
+
 library(ggplot2)
 library(cowplot)
 
@@ -1637,7 +1700,7 @@ p1 = ggplot(pred, aes(x = M, y = error)) +
   theme_cowplot(18) +
   labs(y = "Cetygo", x = "Median methylated intensity") +
   ylim(c(0, max(pred$error)))
-  
+
 
 p2 = ggplot(pred, aes(x = U, y = error)) +
   geom_point(size = 2.5) +
@@ -1669,15 +1732,15 @@ load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix
 load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
 rm(betas, betasTrain, pheno, phenoTrain)
 simData = simPropMaker3(model = HousemanBlood50CpGModel, testBetas = betasTest, pheno = phenoTest$celltype)
-  
+
 ## predict proportions with Cetygo
 pred = projectCellTypeWithError(simData[[1]], modelType = "ownModel", ownModelData = HousemanBlood50CpGModel)
 
 plotDat = cbind.data.frame(Cetygo = pred[,"error"], Max = apply(simData[[2]],1,max))
 
 plotDat$Purity = factor(ifelse(plotDat$Max == 1, "100%", 
-                        ifelse(plotDat$Max == 0.75, "75%",
-                               ifelse(plotDat$Max == 0.5, "50%", "25%"))), 
+                               ifelse(plotDat$Max == 0.75, "75%",
+                                      ifelse(plotDat$Max == 0.5, "50%", "25%"))), 
                         levels = c("100%", "75%", "50%", "25%"))
 
 library(ggplot2)
