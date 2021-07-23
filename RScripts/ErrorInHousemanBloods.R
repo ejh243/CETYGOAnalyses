@@ -979,7 +979,7 @@ dev.off()
 # q()
 # 
 # scp sub.gds dSeiler@knight.ex.ac.uk:/mnt/data1/Thea/ErrorMetric/data/EssexOutput/
-#   
+
 
 ## open gds and make into matrix
 library(gdsfmt)
@@ -1419,48 +1419,48 @@ for(i in 1:length(plotN)){
 # 
 # save(pred, file = "~/wateRmelonPredictedProportionsPurified.Rdata")
 
-### knight code
-load("/mnt/data1/Thea/ErrorMetric/data/EssexOutput/wateRmelonPredictedProportionsPurified.Rdata")
-load("/mnt/data1/Thea/ErrorMetric/data/bloodPurifiedPredictedFromEssex.Rdata")
-
-datB = datB[,c("Bcell", "CD4T", "CD8T", "Gran", "Mono", "NK", "error", "Sample", "DatasetOrigin", "Tissue", "trueProp")]
-library(stringr)
-datB$Sample = str_sub(datB$Sample, 12, -1)
-
-pred$Sample = rownames(pred)
-pred$DatasetOrigin = str_sub(pred$DatasetOrigin, 1, -5)
-colnames(pred)[1:6] = paste(colnames(pred)[1:6],"WateR", sep = "_") 
-
-library(dplyr)
-Pred = inner_join(datB, pred, by = "Sample")
-
-Pred$truePropWateR = Pred$Gran_WateR
-Pred$truePropWateR[Pred$Tissue == "B Cells"] = Pred$Bcell_WateR[Pred$Tissue == "B Cells"]
-Pred$truePropWateR[Pred$Tissue == "NK"] = Pred$NK_WateR[Pred$Tissue == "NK"]
-Pred$truePropWateR[Pred$Tissue == "T Cells"] = Pred$CD4T_WateR[Pred$Tissue == "T Cells"] +
-  Pred$CD8T_WateR[Pred$Tissue == "T Cells"]
-
-
-library(ggplot2)
-library(cowplot)
-library(viridis)
-library(plyr)
-
-Pred$Tissue = revalue(Pred$Tissue, c("B Cells" = "Bcell",
-                                     "Granulocytes" = "Gran",
-                                     "T Cells" = "Tcell" ))
-
-# pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/MinfiVSMyPredForValidation.pdf", height = 7, width = 8)
-png("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/MinfiVSMyPredForValidation.png", height = 500, width = 600)
-ggplot(Pred, aes(x = trueProp, y = truePropWateR, shape = Tissue, col = error)) +
-  geom_point(size = 3) +
-  theme_cowplot(18) +
-  scale_color_viridis() +
-  scale_shape_manual(values = c(20, 3, 8, 18)) +
-  labs(x = "Predictions from unnormalised RBDM\n(Proportion of annotated cell type)",
-       y = "Predictions from wateRmelon\n(Proportion of annotated cell type)", 
-       col = "Cetygo", shape = "Cell type")
-dev.off()
+# ### knight code
+# load("/mnt/data1/Thea/ErrorMetric/data/EssexOutput/wateRmelonPredictedProportionsPurified.Rdata")
+# load("/mnt/data1/Thea/ErrorMetric/data/bloodPurifiedPredictedFromEssex.Rdata")
+# 
+# datB = datB[,c("Bcell", "CD4T", "CD8T", "Gran", "Mono", "NK", "error", "Sample", "DatasetOrigin", "Tissue", "trueProp")]
+# library(stringr)
+# datB$Sample = str_sub(datB$Sample, 12, -1)
+# 
+# pred$Sample = rownames(pred)
+# pred$DatasetOrigin = str_sub(pred$DatasetOrigin, 1, -5)
+# colnames(pred)[1:6] = paste(colnames(pred)[1:6],"WateR", sep = "_") 
+# 
+# library(dplyr)
+# Pred = inner_join(datB, pred, by = "Sample")
+# 
+# Pred$truePropWateR = Pred$Gran_WateR
+# Pred$truePropWateR[Pred$Tissue == "B Cells"] = Pred$Bcell_WateR[Pred$Tissue == "B Cells"]
+# Pred$truePropWateR[Pred$Tissue == "NK"] = Pred$NK_WateR[Pred$Tissue == "NK"]
+# Pred$truePropWateR[Pred$Tissue == "T Cells"] = Pred$CD4T_WateR[Pred$Tissue == "T Cells"] +
+#   Pred$CD8T_WateR[Pred$Tissue == "T Cells"]
+# 
+# 
+# library(ggplot2)
+# library(cowplot)
+# library(viridis)
+# library(plyr)
+# 
+# Pred$Tissue = revalue(Pred$Tissue, c("B Cells" = "Bcell",
+#                                      "Granulocytes" = "Gran",
+#                                      "T Cells" = "Tcell" ))
+# 
+# # pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/MinfiVSMyPredForValidation.pdf", height = 7, width = 8)
+# png("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/MinfiVSMyPredForValidation.png", height = 500, width = 600)
+# ggplot(Pred, aes(x = trueProp, y = truePropWateR, shape = Tissue, col = error)) +
+#   geom_point(size = 3) +
+#   theme_cowplot(18) +
+#   scale_color_viridis() +
+#   scale_shape_manual(values = c(20, 3, 8, 18)) +
+#   labs(x = "Predictions from unnormalised RBDM\n(Proportion of annotated cell type)",
+#        y = "Predictions from wateRmelon\n(Proportion of annotated cell type)", 
+#        col = "Cetygo", shape = "Cell type")
+# dev.off()
 
 
 
@@ -1525,10 +1525,9 @@ labin = paste(levels(plotDat$Celltype), " (Cor = ", core, ")", sep = "")
 names(labin) = levels(plotDat$Celltype)
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/EriskCelltypeError.pdf", height = 11, width = 8)
-ggplot(plotDat, aes(x = cellP, y = error, col = Celltype, shape = Celltype)) +
+ggplot(plotDat, aes(x = cellP, y = error, col = Celltype)) +
   geom_point(size = 2) +
   scale_color_manual(values = colSub[1:5]) +
-  scale_shape_manual(values = c(20, 17, 15, 3, 7)) +
   geom_smooth(method = "lm", se = FALSE) +
   theme_cowplot(18) +
   facet_wrap(~Celltype, nrow = 5, labeller = labeller(Celltype = labin)) +
@@ -1538,122 +1537,122 @@ dev.off()
 
 
 
-### heatmaps for diagram ##############################
-load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
-
-## load functions
-source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
-source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
-
-## subset to include only 3 celltypes
-betasTrain = betasTrain[,which(phenoTrain$celltype %in% c("Bcell", "Mono", "CD8T"))]
-phenoTrain = phenoTrain[which(phenoTrain$celltype %in% c("Bcell", "Mono", "CD8T")),]
-
-## make model with  5 CpGs, make heatmap for each cell type and their equal sum
-model = pickCompProbes(rawbetas = betasTrain,
-                       cellTypes = levels(as.factor(as.character(phenoTrain$celltype))),
-                       cellInd = as.factor(as.character(phenoTrain$celltype)),
-                       numProbes =  5,
-                       probeSelect = "auto")
-
-
-library(gplots)
-library(scales)
-library(ComplexHeatmap)
-
-col = list(Celltype = c("Bcell" = "#F8766D", #"CD4T" = "#B79F00",
-                        "CD8T" = "#00BA38",  #"Gran" = "#00BFC4",
-                        "Mono" = "#619CFF"#,  "NK" = "#F564E3"
-))
-
-ha <- HeatmapAnnotation(Celltype = phenoTrain$celltype,
-                        col = col)
-
-Heatmap(model$coefEst, name = "DNAm",
-        top_annotation = ha, show_row_names = F, show_column_names = F, show_row_dend = F, cluster_rows = F, cluster_columns = F)
-
-Heatmap(rowSums(model$coefEst)/3, cluster_rows = F, cluster_columns = F)
-
-Heatmap(apply(model$coefEst,1, function(x){x[1]*0.8 +
-    x[2]*0.1 +
-    x[3]*0.1 }), cluster_rows = F, cluster_columns = F)
-
-
-Heatmap(apply(model$coefEst,1, function(x){x[1]*0.2 +
-    x[2]*0.4 +
-    x[3]*0.4}), cluster_rows = F, cluster_columns = F)
-
-
-### Check extent of normalisation in model CpGs vs all #####
-## Blood
-load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
-
-library(minfi)
-library(wateRmelon)
-library(FlowSorted.Blood.450k)
-library("IlluminaHumanMethylation450kanno.ilmn12.hg19")
-
-compositeCellType = "Blood"
-platform<-"450k"
-referencePkg <- sprintf("FlowSorted.%s.%s", compositeCellType, platform)
-data(list = referencePkg)
-referenceRGset <- get(referencePkg)
-phenoDat = pData(referenceRGset)$CellType
-
-## only keep the 6 wanted cell types
-index = which(phenoDat == "Bcell" | 
-                phenoDat == "CD4T" | 
-                phenoDat == "CD8T" | 
-                phenoDat == "Gran" | 
-                phenoDat == "Mono" | 
-                phenoDat == "NK")
-phenoDat = as.factor(phenoDat[index]) 
-betas = referenceRGset[,index]
+# ### heatmaps for diagram ##############################
+# load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+# 
+# ## load functions
+# source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+# source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+# 
+# ## subset to include only 3 celltypes
+# betasTrain = betasTrain[,which(phenoTrain$celltype %in% c("Bcell", "Mono", "CD8T"))]
+# phenoTrain = phenoTrain[which(phenoTrain$celltype %in% c("Bcell", "Mono", "CD8T")),]
+# 
+# ## make model with  5 CpGs, make heatmap for each cell type and their equal sum
+# model = pickCompProbes(rawbetas = betasTrain,
+#                        cellTypes = levels(as.factor(as.character(phenoTrain$celltype))),
+#                        cellInd = as.factor(as.character(phenoTrain$celltype)),
+#                        numProbes =  5,
+#                        probeSelect = "auto")
+# 
+# 
+# library(gplots)
+# library(scales)
+# library(ComplexHeatmap)
+# 
+# col = list(Celltype = c("Bcell" = "#F8766D", #"CD4T" = "#B79F00",
+#                         "CD8T" = "#00BA38",  #"Gran" = "#00BFC4",
+#                         "Mono" = "#619CFF"#,  "NK" = "#F564E3"
+# ))
+# 
+# ha <- HeatmapAnnotation(Celltype = phenoTrain$celltype,
+#                         col = col)
+# 
+# Heatmap(model$coefEst, name = "DNAm",
+#         top_annotation = ha, show_row_names = F, show_column_names = F, show_row_dend = F, cluster_rows = F, cluster_columns = F)
+# 
+# Heatmap(rowSums(model$coefEst)/3, cluster_rows = F, cluster_columns = F)
+# 
+# Heatmap(apply(model$coefEst,1, function(x){x[1]*0.8 +
+#     x[2]*0.1 +
+#     x[3]*0.1 }), cluster_rows = F, cluster_columns = F)
+# 
+# 
+# Heatmap(apply(model$coefEst,1, function(x){x[1]*0.2 +
+#     x[2]*0.4 +
+#     x[3]*0.4}), cluster_rows = F, cluster_columns = F)
 
 
-U = getBeta(preprocessRaw(betas))
-N = getBeta(preprocessQuantile(betas, sex = "M"))
+# ### Check extent of normalisation in model CpGs vs all #####
+# ## Blood
+# load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+# 
+# library(minfi)
+# library(wateRmelon)
+# library(FlowSorted.Blood.450k)
+# library("IlluminaHumanMethylation450kanno.ilmn12.hg19")
+# 
+# compositeCellType = "Blood"
+# platform<-"450k"
+# referencePkg <- sprintf("FlowSorted.%s.%s", compositeCellType, platform)
+# data(list = referencePkg)
+# referenceRGset <- get(referencePkg)
+# phenoDat = pData(referenceRGset)$CellType
+# 
+# ## only keep the 6 wanted cell types
+# index = which(phenoDat == "Bcell" | 
+#                 phenoDat == "CD4T" | 
+#                 phenoDat == "CD8T" | 
+#                 phenoDat == "Gran" | 
+#                 phenoDat == "Mono" | 
+#                 phenoDat == "NK")
+# phenoDat = as.factor(phenoDat[index]) 
+# betas = referenceRGset[,index]
+# 
+# 
+# U = getBeta(preprocessRaw(betas))
+# N = getBeta(preprocessQuantile(betas, sex = "M"))
+# 
+# 
+# 
+# 
+# mU = U[rownames(U) %in% rownames(HousemanBlood50CpGModel$coefEsts),]
+# mN = N[rownames(N) %in% rownames(HousemanBlood50CpGModel$coefEsts),]
+# 
+# median(abs(U - N), na.rm = T)
+# median(abs(mU - mN), na.rm = T)
+# 
+# 
+# ## compare to CETS
+# load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
+# library(minfi)
+# library(wateRmelon)
+# library(FlowSorted.DLPFC.450k)
+# library(gdsfmt)
+# library(IlluminaHumanMethylation450kmanifest)
+# 
+# 
+# ## CETS data
+# referencePkg <- sprintf("FlowSorted.%s.%s", "DLPFC", "450k")
+# data(list = referencePkg)
+# referenceRGset <- get(referencePkg)
+# 
+# Uc = getBeta(preprocessRaw(referenceRGset))
+# Nc = getBeta(preprocessQuantile(referenceRGset))
+# 
+# mUc = Uc[rownames(Uc) %in% rownames(CETSmodel$coefEsts),]
+# mNc = Nc[rownames(Nc) %in% rownames(CETSmodel$coefEsts),]
+# 
+# median(abs(Uc - Nc), na.rm = T)
+# median(abs(mUc - mNc), na.rm = T)
 
 
 
 
-mU = U[rownames(U) %in% rownames(HousemanBlood50CpGModel$coefEsts),]
-mN = N[rownames(N) %in% rownames(HousemanBlood50CpGModel$coefEsts),]
-
-median(abs(U - N), na.rm = T)
-median(abs(mU - mN), na.rm = T)
-
-
-## compare to CETS
-load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
-library(minfi)
-library(wateRmelon)
-library(FlowSorted.DLPFC.450k)
-library(gdsfmt)
-library(IlluminaHumanMethylation450kmanifest)
-
-
-## CETS data
-referencePkg <- sprintf("FlowSorted.%s.%s", "DLPFC", "450k")
-data(list = referencePkg)
-referenceRGset <- get(referencePkg)
-
-Uc = getBeta(preprocessRaw(referenceRGset))
-Nc = getBeta(preprocessQuantile(referenceRGset))
-
-mUc = Uc[rownames(Uc) %in% rownames(CETSmodel$coefEsts),]
-mNc = Nc[rownames(Nc) %in% rownames(CETSmodel$coefEsts),]
-
-median(abs(Uc - Nc), na.rm = T)
-median(abs(mUc - mNc), na.rm = T)
-
-
-
-
-### EX/US median sample intensity vs Cetygo ####
+### median sample intensity vs Cetygo ####
 
 ## load data
-dat = read.csv("/mnt/data1/EXTEND/Methylation/QC/Batch1/EXTEND_RIST_SamplesFailedQC.csv")
+# dat = read.csv("/mnt/data1/EXTEND/Methylation/QC/Batch1/EXTEND_RIST_SamplesFailedQC.csv")
 
 # # write.table(dat$Basename, file = "/mnt/data1/Thea/ErrorMetric/data/EXTENDFailedBasenames.txt", append = FALSE, sep = "\t",
 # #             row.names = F, col.names = F, quote = F)
