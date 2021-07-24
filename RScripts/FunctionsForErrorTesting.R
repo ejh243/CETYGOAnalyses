@@ -793,7 +793,7 @@ t.testMatrix = function(dat, pair = T, altVal = "two.sided", LaTex = F){
 # x = modMatProp[22,]
 # pheno = testP
 
-# simulates 126 samples for blood, returns list of simBetas and proportions per cell type
+# simulates 2823 samples for blood, returns list of simBetas and proportions per cell type
 
 simPropMaker3 = function(model, testBetas, pheno, modelList = F){
   
@@ -817,7 +817,7 @@ simPropMaker3 = function(model, testBetas, pheno, modelList = F){
   } 
   
   
-  modMatProp = as.matrix(expand.grid(lapply(numeric(length(levels(pheno))), function(x) seq(0,1,0.25))))
+  modMatProp = as.matrix(expand.grid(lapply(numeric(length(levels(pheno))), function(x) seq(0,1,0.1))))
   modMatProp = modMatProp[rowSums(modMatProp)==1, ]
   colnames(modMatProp) = pheno
   

@@ -225,20 +225,55 @@ stackedWithNoise = ModelCompareStackedBar(testBetas = testData[[1]],
                                           noise = T,
                                           trueProportions = testData[[2]],
                                           nCpGPlot = F,
-                                          sampleNamesOnPlots = F)
+                                          sampleNamesOnPlots = T)
 
 
 leg = get_legend(stackedWithNoise[[3]] + scale_fill_manual(values = c(colOrdeByCell[c(3,1)], "#555353"))
                  + theme(legend.justification="center" ,legend.direction = "horizontal", legend.title = element_blank())
                  + guides(fill = guide_legend(nrow = 1)))
-plots = plot_grid(stackedWithNoise[[1]] + theme(legend.position = "none"),
-                  stackedWithNoise[[2]] + theme(legend.position = "none") +
+plots = plot_grid(stackedWithNoise[[1]] + 
+                    theme(legend.position = "none", 
+                          axis.title.x=element_blank(),
+                          axis.text.x=element_blank(),
+                          axis.ticks.x=element_blank()) +
+                    xlab(element_blank()),
+                  stackedWithNoise[[2]] + 
+                    theme(legend.position = "none",
+                          axis.title.x=element_blank(),
+                          axis.text.x=element_blank(),
+                          axis.ticks.x=element_blank()) + 
                     scale_y_continuous(breaks = seq(0,1,0.25))+
-                    scale_fill_manual(values = colOrdeByCell[c(3,1)]),
-                  stackedWithNoise[[3]] + theme(legend.position = "none") + scale_fill_manual(values = c(colOrdeByCell[c(3,1)], "#555353")), ncol = 1,
-                  rel_heights = c(0.6,1,1), labels = "AUTO", axis = "rl", align = "v" )
+                    scale_fill_manual(values = colOrdeByCell[c(3,1)]) +
+                  xlab(element_blank()),
+                  stackedWithNoise[[3]] + 
+                    scale_fill_manual(values = c(colOrdeByCell[c(3,1)], "#555353")) +
+                    theme(legend.position = "none", 
+                          axis.text.x = element_text(angle = 0, vjust = 0, hjust=0.5))+
+                    scale_x_discrete(labels = c("Sa" = "0",
+                                                "Sb" = " ",
+                                                "Sc" = "0.1",
+                                                "Sd" = " ",
+                                                "Se" = "0.2",
+                                                "Sf" = " ",
+                                                "Sg" = "0.3",
+                                                "Sh" = " ",
+                                                "Si" = "0.4",
+                                                "Sj" = " ",
+                                                "Sk" ="0.5", 
+                                                "Sl" = " ", 
+                                                "Sm" ="0.6", 
+                                                "Sn" =" ",
+                                                "So" ="0.7",
+                                                "Sp" =" ",
+                                                "Sq" ="0.8",
+                                                "Sr" =" ",
+                                                "Ss" ="0.9",
+                                                "St" =" "))+
+                    xlab("Simulated proportion of noise"),
+                  ncol = 1,
+                  rel_heights = c(0.6,1,1.3), labels = "AUTO", axis = "rl", align = "v" )
 
-pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSsimWithNoise.pdf", height = 9, width = 7.5)     
+  
 png("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/CETSsimWithNoise.png", height = 800, width = 600)     
 print(plot_grid(plots, leg, ncol = 1, rel_heights = c(1,0.08)))
 dev.off()
@@ -406,10 +441,10 @@ source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
 betasCETSTrain = betasCETSTrain[rownames(betasCETSTrain) %in% rownames(betas),]
 
 CETSmodelGeo = pickCompProbes(rawbetas = betasCETSTrain,
-                           cellTypes = levels(as.factor(as.character(phenoCETSTrain$Celltype))),
-                           cellInd = as.factor(as.character(phenoCETSTrain$Celltype)),
-                           numProbes = 50,
-                           probeSelect = "auto")
+                              cellTypes = levels(as.factor(as.character(phenoCETSTrain$Celltype))),
+                              cellInd = as.factor(as.character(phenoCETSTrain$Celltype)),
+                              numProbes = 50,
+                              probeSelect = "auto")
 
 pred = as.data.frame(projectCellTypeWithError(betas, modelType = "ownModel", ownModelData = CETSmodelGeo))
 pred$dat = "PAI"

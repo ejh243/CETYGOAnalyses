@@ -309,7 +309,6 @@ png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/WatermelonMinfiOwnNo
 plot_grid(p5,p6,ncol = 1)
 dev.off()
 
-## FROM HERE FOR REMAKING PLOTS ####
 
 
 ### Plot heirarchical cluster of training cpgs used in model #####
@@ -432,7 +431,7 @@ load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
 
 plotDat = as.data.frame(matrix(nrow = 0, ncol = 3))
 for (i in 1:length(modelList)){
-  plotDat = rbind.data.frame(plotDat, cbind.data.frame(1:126, predBulk[[i]][,"error"], names(modelList)[i]))
+  plotDat = rbind.data.frame(plotDat, cbind.data.frame(1:2823, predBulk[[i]][,"error"], names(modelList)[i]))
 }
 colnames(plotDat) = c("Sample", "Cetygo", "Model")
 
@@ -639,15 +638,59 @@ stackedWithNoise = ModelCompareStackedBar(testBetas = testData[[1]],
                                           noise = T,
                                           trueProportions = testData[[2]],
                                           nCpGPlot = F,
-                                          sampleNamesOnPlots = F)
+                                          sampleNamesOnPlots = T)
+
+
+## stats
+min(stackedWithNoise[[1]]$data$error)
+max(stackedWithNoise[[1]]$data$error)
 
 leg = get_legend(stackedWithNoise[[3]]
-                 + theme(legend.justification="center" ,legend.direction = "horizontal", legend.title = element_blank())
+                 + theme(legend.justification = "centre",legend.direction = "horizontal", legend.title = element_blank())
                  + guides(fill = guide_legend(nrow = 1)))
-plots = plot_grid(stackedWithNoise[[1]] + theme(legend.position = "none"),
-                  stackedWithNoise[[2]] + theme(legend.position = "none"),
-                  stackedWithNoise[[3]] + theme(legend.position = "none"), ncol = 1,
-                  rel_heights = c(0.6,1,1), labels = "AUTO", axis = "rl", align = "v" )
+plots = plot_grid(stackedWithNoise[[1]] + 
+                    theme(legend.position = "none", 
+                          axis.title.x=element_blank(),
+                          axis.text.x=element_blank(),
+                          axis.ticks.x=element_blank()) +
+                    xlab(element_blank()),
+                  stackedWithNoise[[2]] + 
+                    theme(legend.position = "none",
+                          axis.title.x=element_blank(),
+                          axis.text.x=element_blank(),
+                          axis.ticks.x=element_blank()) +
+                    xlab(element_blank()),
+                  stackedWithNoise[[3]] + 
+                    theme(legend.position = "none", 
+                          axis.text.x = element_text(angle = 0, vjust = 0, hjust=0.5))+
+                    scale_x_discrete(labels = c("Sa" = "0",
+                                                "Sb" = " ",
+                                                "Sc" = "0.1",
+                                                "Sd" = " ",
+                                                "Se" = "0.2",
+                                                "Sf" = " ",
+                                                "Sg" = "0.3",
+                                                "Sh" = " ",
+                                                "Si" = "0.4",
+                                                "Sj" = " ",
+                                                "Sk" ="0.5", 
+                                                "Sl" = " ", 
+                                                "Sm" ="0.6", 
+                                                "Sn" =" ",
+                                                "So" ="0.7",
+                                                "Sp" =" ",
+                                                "Sq" ="0.8",
+                                                "Sr" =" ",
+                                                "Ss" ="0.9",
+                                                "St" =" "))+
+                    xlab("Simulated proportion of noise"),
+                  ncol = 1,
+                  rel_heights = c(0.6,1,1.3), labels = "AUTO", axis = "rl", align = "v" )
+
+# plots = plot_grid(stackedWithNoise[[1]] + theme(legend.position = "none"),
+#                   stackedWithNoise[[2]] + theme(legend.position = "none"),
+#                   stackedWithNoise[[3]] + theme(legend.position = "none"), ncol = 1,
+#                   rel_heights = c(0.6,1,1), labels = "AUTO", axis = "rl", align = "v" )
 
    
 png("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithNoise.png", height = 800, width = 600)     
@@ -693,7 +736,7 @@ MakeNAsInBetas = function(proportionNA, betas){
 
 propMissing = seq(0,0.9,0.05)
 errorBlood = c()
-for (i in 1:10){
+for (i in 1:100){
   x = sapply(propMissing, MakeNAsInBetas, testDataBlood[[1]])
   rownames(x) = rownames(HousemanBlood50CpGModel$coefEsts)
   errorBlood = cbind(errorBlood, projectCellTypeWithError(YIN = x, 
@@ -734,7 +777,7 @@ plotDat = cbind.data.frame(errorBlood, propMissing = seq(0,0.9,0.05))
 plotDat$propMissing = as.factor(plotDat$propMissing) 
 
 library(reshape2)
-pd = melt(plotDat, measure.vars = c("1","2","3","4","5","6","7","8","9","10"))
+pd = melt(plotDat, id.vars = "propMissing")
 
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithMissingCpGs.pdf", height = 4, width = 5.5) 
@@ -1738,9 +1781,15 @@ pred = projectCellTypeWithError(simData[[1]], modelType = "ownModel", ownModelDa
 plotDat = cbind.data.frame(Cetygo = pred[,"error"], Max = apply(simData[[2]],1,max))
 
 plotDat$Purity = factor(ifelse(plotDat$Max == 1, "100%", 
-                               ifelse(plotDat$Max == 0.75, "75%",
-                                      ifelse(plotDat$Max == 0.5, "50%", "25%"))), 
-                        levels = c("100%", "75%", "50%", "25%"))
+                               ifelse(plotDat$Max == 0.9, "90%",
+                                      ifelse(plotDat$Max == 0.8, "80%",
+                                             ifelse(plotDat$Max == 0.7, "70%",
+                                                    ifelse(plotDat$Max == 0.6, "60%",
+                                                           ifelse(plotDat$Max == 0.5, "50%",
+                                                                  ifelse(plotDat$Max == 0.4, "40%",
+                                                                         ifelse(plotDat$Max == 0.3, "30%",
+                                                                                "20%")))))))), 
+                        levels = c("100%", "90%", "80%", "70%", "60%", "50%", "40%", "30%", "20%"))
 
 library(ggplot2)
 library(cowplot)
