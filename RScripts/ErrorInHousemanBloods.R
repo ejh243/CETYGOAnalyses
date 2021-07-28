@@ -391,7 +391,7 @@ cellTypeShorthand = c("B", "C4", "C8", "G", "M", "NK")
 # 
 # save(modelList, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
 
-load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+# load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
 
 # ## mean proportions of each cell type in whole blood (from Reinius2012)
 # meanBloodProp = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43)
@@ -400,7 +400,7 @@ load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
 # # each cell type will be simulated with mean, mean +- sd, mean +- 2sd
 
 ## simulate data in stratified way
-bulk = simPropMaker3(model = modelList, testBetas = betasTest, pheno = phenoTest$celltype, modelList = T)
+# bulk = simPropMaker3(model = modelList, testBetas = betasTest, pheno = phenoTest$celltype, modelList = T)
 
 
 # bulk = CellTypeProportionSimulator(GetModelCG(betasTest, modelList),
@@ -417,14 +417,14 @@ bulk = simPropMaker3(model = modelList, testBetas = betasTest, pheno = phenoTest
 #                            trueComparison = T,
 #                            trueProportions = bulk[[2]])
 
-predBulk = list()
-for (i in 1:length(modelList)){
-  predBulk[[i]] = projectCellTypeWithError(bulk[[1]], modelType = "ownModel", ownModelData = modelList[[i]])
-}
+# predBulk = list()
+# for (i in 1:length(modelList)){
+#   predBulk[[i]] = projectCellTypeWithError(bulk[[1]], modelType = "ownModel", ownModelData = modelList[[i]])
+# }
 
 
 # save(modelList, bulk, stackedPlots, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
-save(modelList, bulk, predBulk, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+# save(modelList, bulk, predBulk, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
 
 
 load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
@@ -468,6 +468,7 @@ dev.off()
 ## why do some still predict well? low proportion of that cell type? cell type less important?
 
 ## compare those with only 5 to simplify the question
+library(plyr)
 plotDat5 = plotDat[plotDat$nCelltypes == 5, ]
 plotDat5$mod = factor(unlist(strsplit(as.character(plotDat5$Model), "l_"))[seq(2,nrow(plotDat5)*2,2)],
                       levels = c("C4C8GMNK", "BC8GMNK", "BC4GMNK", "BC4C8MNK", "BC4C8GNK", "BC4C8GM"))
@@ -539,10 +540,12 @@ for(i in 1:6){
                     axis.title.x=element_blank(),
                     axis.text.x=element_blank(),
                     axis.ticks.x=element_blank()) +
+              scale_y_continuous(breaks=c(0, 0.25, 0.50, 0.75,1)) +
               xlab(element_blank()),
             models5Compared[[i]][[3]] + 
               theme(legend.position = "none", 
                     axis.text.x = element_text(angle = 0, vjust = 0, hjust=0.5))+
+              scale_y_continuous(breaks=c(0, 0.25, 0.50, 0.75,1)) +
               scale_x_discrete(labels = c("Sa" = "0.1",
                                           "Sb" = "0.2",
                                           "Sc" = "0.3",
@@ -833,7 +836,7 @@ ggplot(allPheno, aes(x = data, y = error, fill = sex)) +
   labs(y = "Cetygo", x = "Dataset", fill = "Sex")
 dev.off()
 
-
+x=summary(lm(error~as.numeric(age), allPheno))
 
 ## create age from 38 phenotype
 # allPheno$ageDiff = abs(as.numeric(as.character(allPheno$age))-38)
@@ -1780,22 +1783,13 @@ pred = projectCellTypeWithError(simData[[1]], modelType = "ownModel", ownModelDa
 
 plotDat = cbind.data.frame(Cetygo = pred[,"error"], Max = apply(simData[[2]],1,max))
 
-plotDat$Purity = factor(ifelse(plotDat$Max == 1, "100%", 
-                               ifelse(plotDat$Max == 0.9, "90%",
-                                      ifelse(plotDat$Max == 0.8, "80%",
-                                             ifelse(plotDat$Max == 0.7, "70%",
-                                                    ifelse(plotDat$Max == 0.6, "60%",
-                                                           ifelse(plotDat$Max == 0.5, "50%",
-                                                                  ifelse(plotDat$Max == 0.4, "40%",
-                                                                         ifelse(plotDat$Max == 0.3, "30%",
-                                                                                "20%")))))))), 
-                        levels = c("100%", "90%", "80%", "70%", "60%", "50%", "40%", "30%", "20%"))
+save(plotDat, file = "/mnt/data1/Thea/ErrorMetric/data/plotDat/purityPlot.Rdata")
 
 library(ggplot2)
 library(cowplot)
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/PurityOfSampleCetygo.pdf", height = 5, width = 6)
-ggplot(plotDat, aes(x = Purity, y = Cetygo)) +
+ggplot(plotDat, aes(x = factor(Max, levels = seq(1,0.2,-0.1)), y = Cetygo)) +
   geom_violin() +
   theme_cowplot(18) +
   labs(x = "Maximum cellular proportion\nat any cell type")
