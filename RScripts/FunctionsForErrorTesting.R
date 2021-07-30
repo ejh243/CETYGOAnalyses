@@ -817,7 +817,7 @@ simPropMaker3 = function(model, testBetas, pheno, modelList = F){
   } 
   
   
-  modMatProp = as.matrix(expand.grid(lapply(numeric(length(levels(pheno))), function(x) seq(0,1,0.1))))
+  modMatProp = as.matrix(expand.grid(lapply(numeric(length(pheno)), function(x) seq(0,1,0.1))))
   modMatProp = modMatProp[rowSums(modMatProp)==1, ]
   colnames(modMatProp) = pheno
   
