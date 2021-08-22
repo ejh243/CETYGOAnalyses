@@ -341,25 +341,25 @@ Heatmap(modelBetas, name = "DNAm",
         top_annotation = ha, show_row_names = F, show_column_names = F, show_row_dend = F)
 dev.off()
 
-# ### plot PCA of model CpGs ############################
-# ## full PCA to show celltype similarity
-# load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
-# 
-# library(ggfortify)
-# library(ggplot2)
-# library(cowplot)
-# library(scales)
-# 
-# pheno = data.frame(celltype = colnames(HousemanBlood50CpGModel$coefEsts))
-# plotDatPCAFULL = autoplot(prcomp(t(HousemanBlood50CpGModel$coefEsts)), 
-#                           data = pheno, col = "celltype", shape = "celltype", size = 3) +
-#   theme_cowplot(18)
-# 
-# # pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.pdf",height = 6, width = 6)
-# png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.png",height = 500, width = 550)
-# plotDatPCAFULL +
-#   labs(col = "Cell type", shape = "Cell type")
-# dev.off()
+### plot PCA of model CpGs ############################
+## full PCA to show celltype similarity
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+
+library(ggfortify)
+library(ggplot2)
+library(cowplot)
+library(scales)
+
+pheno = data.frame(celltype = colnames(HousemanBlood50CpGModel$coefEsts))
+plotDatPCAFULL = autoplot(prcomp(t(HousemanBlood50CpGModel$coefEsts)),
+                          data = pheno, col = "celltype", size = 3) +
+  theme_cowplot(18)
+
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.pdf",height = 6, width = 6)
+png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.png",height = 450, width = 500)
+plotDatPCAFULL +
+  labs(col = "Cell type")
+dev.off()
 
 
 ### Create models using 3:6 cell types ################
@@ -643,6 +643,25 @@ stackedWithNoise = ModelCompareStackedBar(testBetas = testData[[1]],
                                           nCpGPlot = F,
                                           sampleNamesOnPlots = T)
 
+### Cetygo vs accuracy w noise
+library(reshape2)
+library(viridis)
+dat1 = dcast(as.data.frame(stackedWithNoise[[1]]$data), sample + error ~cellType, value.var = proportion_pred)
+dat2 = dcast(as.data.frame(stackedWithNoise[[3]]$data), sample ~cellType, value.var = proportion_pred)
+dat = cbind.data.frame(dat1, dat2)
+
+dat1$rmse = apply(dat, 1, function(x){sqrt(mean(as.numeric(x[3:8])- as.numeric(x[10:15]))^2)})
+dat1$noise = dat2$Noise
+
+cor(dat1$rmse, dat1$error)
+
+png("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithNoiseCetygoVSAcc.png", height = 400, width = 450)  
+ggplot(dat1, aes(x = rmse, y = error, col = noise)) +
+  geom_point(size = 2.5) +
+  theme_cowplot(18) +
+  labs(x = "RMSE of predicted and actual\nproportions", y = "Cetygo", col = "Noise") +
+  scale_color_viridis()
+dev.off()  
 
 ## stats
 min(stackedWithNoise[[1]]$data$error)
@@ -738,53 +757,30 @@ MakeNAsInBetas = function(proportionNA, betas){
 }
 
 propMissing = seq(0,0.9,0.05)
-errorBlood = c()
+errorBlood = acc = c()
 for (i in 1:100){
   x = sapply(propMissing, MakeNAsInBetas, testDataBlood[[1]])
   rownames(x) = rownames(HousemanBlood50CpGModel$coefEsts)
-  errorBlood = cbind(errorBlood, projectCellTypeWithError(YIN = x, 
-                                                          modelType = "ownModel",
-                                                          ownModelData = HousemanBlood50CpGModel)[,"error"])
+  temp = projectCellTypeWithError(YIN = x, 
+                                  modelType = "ownModel",
+                                  ownModelData = HousemanBlood50CpGModel)
+  errorBlood = cbind(errorBlood, temp[,"error"])
+  acc = cbind(acc, apply(temp[,1:6], 1, function(x){RMSE(x,testDataBlood[[2]])}))
 }
 
-# ## now in brain
-# load("/mnt/data1/Thea/humanDeconvolution/data/CETSTrainTest.RData")
-# 
-# meanBrainProp = matrix(nrow = 1, byrow = T, data = c(0.5,0.5))
-# colnames(meanBrainProp) = levels(phenoCETSTest$Celltype)
-# 
-# ## create a single 50/50 sample
-# testDataBrain = CellTypeProportionSimulator(betas = GetModelCG(betasCETSTest, list(CETSmodel)), 
-#                                        pheno = phenoCETSTest, 
-#                                        phenoColName = "Celltype", 
-#                                        nBulk = 1, 
-#                                        proportionsMatrixType = "own",
-#                                        proportionsMatrix = meanBrainProp,
-#                                        noiseIn = F)
-# 
-# 
-# errorBrain = c()
-# propMissing = seq(0,0.5,0.05)
-# #for (i in 1:10){
-#   x = sapply(propMissing, MakeNAsInBetas, testDataBrain[[1]])
-#   rownames(x) = rownames(CETSmodel$coefEsts)
-#   errorBrain = cbind(errorBrain, projectCellTypeWithError(YIN = x, 
-#                                                           modelType = "ownModel",
-#                                                           ownModelData = CETSmodel)[,"error"])
-# #}
-# 
-#   ## don't do it in brain if it legit doesn't work!!
 
 
 plotDat = cbind.data.frame(errorBlood, propMissing = seq(0,0.9,0.05))
-plotDat$propMissing = as.factor(plotDat$propMissing) 
+acc = as.data.frame(acc)
+plotDat$propMissing = acc$propMissing = as.factor(plotDat$propMissing) 
 
 library(reshape2)
-pd = melt(plotDat, id.vars = "propMissing")
-
+pd = cbind.data.frame(melt(plotDat, id.vars = "propMissing"), 
+                      melt(acc, id.vars = "propMissing"))
+colnames(pd) = c("propMissing", "x", "error", "propMissing2", "y", "RMSE")
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithMissingCpGs.pdf", height = 4, width = 5.5) 
-ggplot(pd, aes(x = propMissing, y = value)) +
+ggplot(pd, aes(x = propMissing, y = error)) +
   geom_violin() +
   theme_cowplot(18) +
   scale_x_discrete(breaks=c(0, 0.25, 0.50, 0.75)) +
@@ -792,7 +788,14 @@ ggplot(pd, aes(x = propMissing, y = value)) +
   theme(legend.position = "none")
 dev.off()
 
-
+library(viridis)
+png("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithMissingCpGsACCVSCETygo.png", height = 400, width = 450)
+ggplot(pd, aes(x = RMSE, y = error, col = as.numeric(as.character(propMissing)))) +
+  theme_cowplot(18)+
+  geom_point() +
+  labs(x = "RMSE of predicted and actual\nproportions", y = "Cetygo", col = "Proportion\nmissing") +
+  scale_color_viridis()
+dev.off()
 
 ### Check effect of age, sex in EXTEND and US #########
 ## load model
@@ -1783,7 +1786,7 @@ pred = projectCellTypeWithError(simData[[1]], modelType = "ownModel", ownModelDa
 
 plotDat = cbind.data.frame(Cetygo = pred[,"error"], Max = apply(simData[[2]],1,max))
 
-save(plotDat, file = "/mnt/data1/Thea/ErrorMetric/data/plotDat/purityPlot.Rdata")
+save(plotDat, pred, simData, file = "/mnt/data1/Thea/ErrorMetric/data/plotDat/purityPlot.Rdata")
 
 library(ggplot2)
 library(cowplot)
@@ -1794,3 +1797,89 @@ ggplot(plotDat, aes(x = factor(Max, levels = seq(1,0.2,-0.1)), y = Cetygo)) +
   theme_cowplot(18) +
   labs(x = "Maximum cellular proportion\nat any cell type")
 dev.off()
+
+### plot n cell types with 0 prop against pred 0
+load("/mnt/data1/Thea/ErrorMetric/data/plotDat/purityPlot.Rdata")
+
+library(ggplot2)
+library(cowplot)
+
+simData[[2]] = simData[[2]][,colnames(pred)[1:6]]
+simData[[2]] = as.data.frame(simData[[2]])
+pred = as.data.frame(pred)
+
+library(reshape2)
+dat = cbind.data.frame(melt(pred, measure.vars = c(colnames(pred)[1:6]), id.vars = c("error", "nCGmissing")), 
+                       melt(simData[[2]], measure.vars = c(colnames(pred)[1:6])))
+
+colnames(dat) = c("error", "nCGmissing", "Celltype", "pred", "Celltype.x", "true")
+dat$diff = abs(dat$true - dat$pred)
+
+png("/mnt/data1/Thea/ErrorMetric/plots/badData/AccuracyIsCellTypeDependent.png", height = 450, width = 500)
+ggplot(dat, aes(x = Celltype, y = diff, fill = Celltype)) +
+  geom_violin() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  theme_cowplot(18) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none") +
+  labs(x = "Cell type", y = "Simulated - predicted proportion")
+dev.off()
+
+# 
+# 
+# dat$true = as.factor(dat$true)
+# dat = dat[-which(dat$true == 0 | dat$true == 1),]
+# 
+# png("/mnt/data1/Thea/ErrorMetric/plots/badData/purityCellTypeExplanation.png", height = 500, width = 550)
+# ggplot(dat, aes(x = true, y = diff, fill = Celltype)) +
+#   geom_violin() +
+#   geom_hline(yintercept = 0, linetype = "dashed") +
+#   facet_wrap(~Celltype, ncol = 2) +
+#   theme_cowplot(18) + 
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+#   labs(x = "Simulated proportion", y = "Simulated - predicted proportions")
+# dev.off()
+# 
+# 
+# ggplot(dat, aes(x = true, y = error, fill = Celltype)) +
+#   geom_violin() +
+#   geom_hline(yintercept = 0, linetype = "dashed") +
+#   facet_wrap(~Celltype, ncol = 2) +
+#   theme_cowplot(18) + 
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+#   labs(x = "Simulated proportion", y = "Cetygo")
+
+
+
+#### plot sim RMSE vs Cetygo across all sim samples ####
+load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+pred = predBulk[[1]]
+rm(modelList, predBulk)
+
+pred = as.data.frame(pred)
+true = bulk[[2]][,colnames(pred)[1:6]]
+colnames(pred)[1:6] = paste(colnames(true), "_t", sep = "")
+all = cbind.data.frame(pred, true)
+
+RMSE = function(m, o){
+  sqrt(mean((m - o)^2))
+}
+
+all$rmse = apply(all, 1, function(x){RMSE(x[1:6], x[9:14])})
+
+library(ggplot2)
+library(cowplot)
+install.packages("scatterpie")
+library(scatterpie)
+
+ggplot() +
+  geom_scatterpie(data = all, aes(x = rmse, y = error),
+                  size = 0.8,
+                  cols = c("Bcell_t", "CD4T_t", "CD8T_t", "Gran_t", "Mono_t", "NK_t")) + 
+  coord_equal() +
+  theme_cowplot(18) +
+  labs(x = "RMSE of predicted and simulated\nproportions",
+       y = "Cetygo")
+
+## useless! Too much going on!
+

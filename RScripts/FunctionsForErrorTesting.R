@@ -853,7 +853,7 @@ nCellsNeededForDeconvolution = function(betas, phenoCell){
   
   # matrix of possible inclusions of individual
   modMat = as.matrix(expand.grid(lapply(numeric(nPerCelltype), function(x) c(T, F))))
-  modMat = modMat[rowSums(modMat)>1 & rowSums(modMat)<6, ]
+  modMat = modMat[rowSums(modMat)>1 & rowSums(modMat)<nPerCelltype, ]
   
   
   createAndApplyRBDM = function(modMatRow){
@@ -874,6 +874,10 @@ nCellsNeededForDeconvolution = function(betas, phenoCell){
                            cellInd = trainP,
                            numProbes =  50,
                            probeSelect = "auto")
+    
+    if(nrow(model$coefEsts) == 0){
+      return(NA)
+    }
     
     ## create testing data using simulation framework
     simList = simPropMaker3(model, testBetas = testB, pheno = testP)
@@ -908,4 +912,17 @@ nCellsNeededForDeconvolution = function(betas, phenoCell){
   )
   
 }
+
+
+##### accuracy in pred ####
+RMSE = function(m, o){
+  sqrt(mean((m - o)^2))
+}
+
+# accuracyCalc = function(blood1, blood2, bloodColName = c("Bcell",  "CD4T",   "CD8T",  "Gran",  "Mono", "NK")){
+#   if(dim(blood2) ==1){
+#     blood2 = 
+#   }
+# } 
+
 
