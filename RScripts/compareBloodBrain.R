@@ -58,7 +58,7 @@ ggplot(dat, aes(x = error.x, y = error.y, col = Tissue.x)) +
   geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
   geom_vline(xintercept = 0.1, col = "red", linetype = "dashed") +
   theme_cowplot(18) +
-  labs(x = "Cetygo in blood RBDM", y = "Cetygo in brain RBDM", col = "Tissue")
+  labs(x = "Cetygo from Model 6CellBlood", y = "Cetygo from Model 2CellPFC", col = "Tissue")
 dev.off()
 
 ## get sample sizes of each tissue in each quadrant

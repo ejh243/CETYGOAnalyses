@@ -392,7 +392,7 @@ dat.pos = data.frame(TissueBrain = levels(dat$TissueBrain), pos, n = dat_summary
 pdf("/mnt/data1/Thea/ErrorMetric/plots/CETSValidation/ErrorCETSEssexsAllTissueBoxplot.pdf", height = 9, width = 14)
 ggplot(dat, aes(x = fct_reorder(TissueBrain, brain, .fun = median, .desc =TRUE))) +
   geom_boxplot(aes(y = error, fill = as.factor(brain))) +
-  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  # geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
   theme_cowplot(18) +
   scale_fill_manual(values = c("#0A8ABA", "#BA3A0A"), name = "Brain?", labels = c("No", "Yes")) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +

@@ -530,35 +530,35 @@ for(i in 1:6){
                    + theme(legend.justification = "centre",legend.direction = "horizontal", legend.title = element_blank())
                    + guides(fill = guide_legend(nrow = 1)))
   plots = plot_grid(models5Compared[[i]][[1]] + 
-              theme(legend.position = "none", 
-                    axis.title.x=element_blank(),
-                    axis.text.x=element_blank(),
-                    axis.ticks.x=element_blank()) +
-              xlab(element_blank()),
-            models5Compared[[i]][[2]] + 
-              theme(legend.position = "none",
-                    axis.title.x=element_blank(),
-                    axis.text.x=element_blank(),
-                    axis.ticks.x=element_blank()) +
-              scale_y_continuous(breaks=c(0, 0.25, 0.50, 0.75,1)) +
-              xlab(element_blank()),
-            models5Compared[[i]][[3]] + 
-              theme(legend.position = "none", 
-                    axis.text.x = element_text(angle = 0, vjust = 0, hjust=0.5))+
-              scale_y_continuous(breaks=c(0, 0.25, 0.50, 0.75,1)) +
-              scale_x_discrete(labels = c("Sa" = "0.1",
-                                          "Sb" = "0.2",
-                                          "Sc" = "0.3",
-                                          "Sd" = "0.4",
-                                          "Se" = "0.5",
-                                          "Sf" = "0.6",
-                                          "Sg" = "0.7",
-                                          "Sh" = "0.8",
-                                          "Si" = "0.9",
-                                          "Sj" = "1.0"))+
-              xlab(paste("Simulated proportion of", strsplit(wantedModelNames[i], " ")[[1]][1])),
-            ncol = 1,
-            rel_heights = c(0.6,1,1.2), labels = "AUTO", axis = "rl", align = "v" )
+                      theme(legend.position = "none", 
+                            axis.title.x=element_blank(),
+                            axis.text.x=element_blank(),
+                            axis.ticks.x=element_blank()) +
+                      xlab(element_blank()),
+                    models5Compared[[i]][[2]] + 
+                      theme(legend.position = "none",
+                            axis.title.x=element_blank(),
+                            axis.text.x=element_blank(),
+                            axis.ticks.x=element_blank()) +
+                      scale_y_continuous(breaks=c(0, 0.25, 0.50, 0.75,1)) +
+                      xlab(element_blank()),
+                    models5Compared[[i]][[3]] + 
+                      theme(legend.position = "none", 
+                            axis.text.x = element_text(angle = 0, vjust = 0, hjust=0.5))+
+                      scale_y_continuous(breaks=c(0, 0.25, 0.50, 0.75,1)) +
+                      scale_x_discrete(labels = c("Sa" = "0.1",
+                                                  "Sb" = "0.2",
+                                                  "Sc" = "0.3",
+                                                  "Sd" = "0.4",
+                                                  "Se" = "0.5",
+                                                  "Sf" = "0.6",
+                                                  "Sg" = "0.7",
+                                                  "Sh" = "0.8",
+                                                  "Si" = "0.9",
+                                                  "Sj" = "1.0"))+
+                      xlab(paste("Simulated proportion of", strsplit(wantedModelNames[i], " ")[[1]][1])),
+                    ncol = 1,
+                    rel_heights = c(0.6,1,1.2), labels = "AUTO", axis = "rl", align = "v" )
   
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
   theme(axis.title.x=element_blank(),
@@ -714,7 +714,7 @@ plots = plot_grid(stackedWithNoise[[1]] +
 #                   stackedWithNoise[[3]] + theme(legend.position = "none"), ncol = 1,
 #                   rel_heights = c(0.6,1,1), labels = "AUTO", axis = "rl", align = "v" )
 
-   
+
 png("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithNoise.png", height = 800, width = 600)     
 print(plot_grid(plots, leg, ncol = 1, rel_heights = c(1,0.08)))
 dev.off()
@@ -784,7 +784,7 @@ ggplot(pd, aes(x = propMissing, y = error)) +
   geom_violin() +
   theme_cowplot(18) +
   scale_x_discrete(breaks=c(0, 0.25, 0.50, 0.75)) +
-  labs(x = "Proportion of CpGs missing", y = "Cetygo") +
+  labs(x = "Proportion of sites missing", y = "Cetygo") +
   theme(legend.position = "none")
 dev.off()
 
@@ -1096,7 +1096,7 @@ dat.pos = data.frame(TissueBlood = levels(dat$TissueBlood), pos, n = dat_summary
 pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexsAllTissueBoxplot.pdf", height = 9, width = 14)
 ggplot(dat, aes(x = fct_reorder(TissueBlood, blood, .fun = median, .desc =TRUE))) +
   geom_boxplot(aes(y = error, fill = as.factor(blood))) +
-  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  # geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
   theme_cowplot(18) +
   scale_fill_manual(values = c("#0A8ABA", "#BA3A0A"), name = "Blood?", labels = c("No", "Yes")) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
@@ -1160,6 +1160,7 @@ load("/mnt/data1/Thea/ErrorMetric/data/bloodPurifiedPredictedFromEssex.Rdata")
 # pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodCellTypevsError.pdf", height = 10, width = 15)
 png("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodCellTypevsError.png", height = 600, width = 600)
 ggplot(datB, aes(x = trueProp, y = error, col = DatasetOrigin)) +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
   geom_point(size = 2.5) +
   theme_cowplot(18) +
   labs(x = "Predicted proportion", y = "Cetygo", col = "Data") +
@@ -1189,7 +1190,7 @@ for(i in 1:length(levels(datB$Tissue))){
   plotList = c(plotList, 
                cellTypeCompareStackedBar(
                  datB[datB$Tissue == levels(datB$Tissue)[i],], labPerPlot = c("   i", "  ii"),
-                 legendPosition = "none"))
+                 legendPosition = "none", dashLine = T))
 }
 
 plotN = list(
@@ -1211,6 +1212,13 @@ plotLeg = get_legend(cellTypeCompareStackedBar(
 #   print(plotList[[i]])
 #   dev.off()
 # }
+
+## just get the Tcell example
+p = plotList[[22]]
+png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar3.png", sep = ""), height = 400, width = 500)
+print(plot_grid(p, plotLeg, ncol = 2, rel_widths = c(1,0.3)))
+dev.off()
+
 
 for(i in 1:length(plotN)){
   if(length(plotN[[i]]) ==1){
@@ -1575,6 +1583,7 @@ names(labin) = levels(plotDat$Celltype)
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/EriskCelltypeError.pdf", height = 11, width = 8)
 ggplot(plotDat, aes(x = cellP, y = error, col = Celltype)) +
+  geom_hline(yintercept = 0.1, col= "red", linetype = "dashed") +
   geom_point(size = 2) +
   scale_color_manual(values = colSub[1:5]) +
   geom_smooth(method = "lm", se = FALSE) +
@@ -1822,7 +1831,7 @@ ggplot(dat, aes(x = Celltype, y = diff, fill = Celltype)) +
   theme_cowplot(18) + 
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
         legend.position = "none") +
-  labs(x = "Cell type", y = "Simulated - predicted proportion")
+  labs(x = "Cell type", y = "Difference between simulated\nand predicted proportion")
 dev.off()
 
 # 
@@ -1883,3 +1892,87 @@ ggplot() +
 
 ## useless! Too much going on!
 
+
+
+#### compare accuracy of 3 mod to 6 mod in those in 3 mod ####
+load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+cellTypes = c("Bcell", "CD4T", "CD8T", "Gran", "Mono", "NK")
+cellTypeShorthand = c("B", "C4", "C8", "G", "M", "NK")
+
+
+modelPresent = matrix(ncol = length(cellTypes), nrow = 42, data = 0)
+colnames(modelPresent) = cellTypes
+
+
+for(i in 1:6){
+  modelPresent[grep(cellTypeShorthand[i],names(modelList)),i] = 1
+}
+
+modelN = rowSums(modelPresent)
+
+
+mod6 = modelList[[which(modelN == 6)]]
+
+mod3Index = which(modelN == 3)
+i = 1
+
+for (i in 1:length(mod3Index)){
+  ## index the samples that have the right cell types in
+  mod3Cell = modelPresent[mod3Index[i],]
+  cell3Index = which(rowSums(bulk[[2]][,names(mod3Cell)[mod3Cell == 0]]) == 0)
+  
+  ## RMSE of accuracy in mod3
+  acc3 = apply(cbind.data.frame(predBulk[[mod3Index[i]]][cell3Index,], 
+                                bulk[[2]][cell3Index, colnames(predBulk[[mod3Index[i]]][cell3Index,])[1:3]]),
+               1, 
+               function(x){RMSE(x[1:3], x[c(6,7,8)])})
+  acc6 = apply(cbind.data.frame(predBulk[[which(modelN == 6)]][cell3Index,], bulk[[2]][cell3Index,]),
+               1, 
+               function(x){RMSE(x[1:6], x[c(12, 10, 11, 9, 13, 14)])})
+  err3 = predBulk[[mod3Index[i]]][cell3Index,"error"]
+  err6 = predBulk[[which(modelN == 6)]][cell3Index,"error"]
+}
+
+plotDat = cbind.data.frame(err3, err6, acc3, acc6)
+
+library(ggplot2)
+library(cowplot)
+library(viridis)
+
+ggplot(plotDat, aes(x = err3, y = err6)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = c(0,0)) +
+  ylim(c(0.015,0.05)) +
+  xlim(c(0.015,0.05)) +
+  theme_cowplot(18) +
+  labs(x = "Cetygo across 3 cell type model",
+       y = "Cetygo across 6 cell type model")
+
+ggplot(plotDat, aes(x = acc3, y = acc6)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = c(0,0)) +
+  # ylim(c(0.015,0.05)) +
+  # xlim(c(0.015,0.05)) +
+  theme_cowplot(18) +
+  labs(x = "RMSE across 3 cell type model",
+       y = "RMSE across 6 cell type model")
+
+ggplot(plotDat, aes(x = acc3, y = err3)) +
+  geom_point() +
+  # geom_abline(slope = 1, intercept = c(0,0)) +
+  # ylim(c(0.015,0.05)) +
+  # xlim(c(0.015,0.05)) +
+  theme_cowplot(18) +
+  labs(x = "RMSE across 3 cell type model",
+       y = "Cetygo across 3 cell type model")
+
+ggplot(plotDat, aes(x = acc6, y = err6)) +
+  geom_point() +
+  # geom_abline(slope = 1, intercept = c(0,0)) +
+  # ylim(c(0.015,0.05)) +
+  # xlim(c(0.015,0.05)) +
+  theme_cowplot(18) +
+  labs(x = "RMSE across 6 cell type model",
+       y = "Cetygo across 6 cell type model")

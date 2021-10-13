@@ -515,7 +515,7 @@ ModelCompareStackedBar = function(testBetas,
 ##        cellTypeName 
 
 ## OUTPUT plotList
-cellTypeCompareStackedBar = function(predictions, labPerPlot = "AUTO", legendPosition = "default", BonlyForLeg = F){
+cellTypeCompareStackedBar = function(predictions, labPerPlot = "AUTO", legendPosition = "default", BonlyForLeg = F, dashLine = T){
   
   cellTypeName = as.character(predictions$Tissue[1])
   cellTypeName[cellTypeName == "Granulocytes"] = "Gran"
@@ -541,7 +541,7 @@ cellTypeCompareStackedBar = function(predictions, labPerPlot = "AUTO", legendPos
     
     colNeeded = which(allCellTypes %in% levels(as.factor(as.character(plotDat$cellType))))
     
-    
+    if (dashLine){
     plotA = ggplot(plotDat, aes(x = fct_reorder(sample, error, .fun = mean), y = error)) +
       geom_point(size = 2) +
       theme_cowplot(18) +
@@ -552,6 +552,18 @@ cellTypeCompareStackedBar = function(predictions, labPerPlot = "AUTO", legendPos
       labs(x = "Sample", y = "Cetygo") +
       ggtitle(paste(cellTypeName, "-", levels(predictions$DatasetOrigin)[i])) +
       ylim(c(0, max(predictions$error)))
+    }else{
+      plotA = ggplot(plotDat, aes(x = fct_reorder(sample, error, .fun = mean), y = error)) +
+        geom_point(size = 2) +
+        theme_cowplot(18) +
+        # geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+        theme(axis.title.x=element_blank(),
+              axis.text.x=element_blank(),
+              axis.ticks.x=element_blank()) +
+        labs(x = "Sample", y = "Cetygo") +
+        ggtitle(paste(cellTypeName, "-", levels(predictions$DatasetOrigin)[i])) +
+        ylim(c(0, max(predictions$error)))
+    }
     
     if(legendPosition == "default"){
     plotB =  ggplot(plotDat, aes(x = fct_reorder(sample, error, .fun = mean), y = proportion_pred, fill = cellType)) +
@@ -807,7 +819,7 @@ simPropMaker3 = function(model, testBetas, pheno, modelList = F){
     
     temp = matrix(nrow = nrow(testBetas), ncol = length(levels(pheno)))
     for(i in 1:length(levels(pheno))){
-      temp[,i] = apply(testBetas[,which(pheno == levels(pheno)[i])], 1, mean)
+      temp[,i] = apply(testBetas[,which(pheno == levels(pheno)[i])], 1, mean, na.rm = T)
       
     }
     colnames(temp) = levels(pheno)
