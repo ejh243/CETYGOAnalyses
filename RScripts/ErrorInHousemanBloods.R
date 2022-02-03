@@ -351,14 +351,37 @@ library(cowplot)
 library(scales)
 
 pheno = data.frame(celltype = colnames(HousemanBlood50CpGModel$coefEsts))
+
 plotDatPCAFULL = autoplot(prcomp(t(HousemanBlood50CpGModel$coefEsts)),
                           data = pheno, col = "celltype", size = 3) +
-  theme_cowplot(18)
+                  theme_cowplot(18)
 
 # pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.pdf",height = 6, width = 6)
 png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.png",height = 450, width = 500)
 plotDatPCAFULL +
   labs(col = "Cell type")
+dev.off()
+
+
+p2 = autoplot(prcomp(t(HousemanBlood50CpGModel$coefEsts)),
+         data = pheno, col = "celltype", size = 3, x = 3, y = 4) +
+  theme_cowplot(18) +
+  labs(col = "Cell type")
+
+p1 = autoplot(prcomp(t(HousemanBlood50CpGModel$coefEsts)),
+         data = pheno, col = "celltype", size = 3, x = 1, y = 2) +
+  theme_cowplot(18) +
+  labs(col = "Cell type")
+
+leg = get_legend(p1+ theme(legend.position = "bottom"))
+
+
+png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.png",
+    height = 650, width = 350)
+plot_grid(p1 + theme(legend.position = "none"), 
+          p2 + theme(legend.position = "none"), 
+          leg, ncol = 1, rel_heights = c(1,1,0.3))
+
 dev.off()
 
 
@@ -451,6 +474,21 @@ x = cbind.data.frame(nCelltypes = y, Model = names(modelList))
 
 plotDat = merge(plotDat, x, by = "Model")
 
+## get plot stats
+range(plotDat[plotDat$nCelltypes == "3","Cetygo"])
+range(plotDat[plotDat$nCelltypes == "4","Cetygo"])
+range(plotDat[plotDat$nCelltypes == "5","Cetygo"])
+range(plotDat[plotDat$nCelltypes == "6","Cetygo"])
+
+mean(plotDat[plotDat$nCelltypes == "3","Cetygo"])
+mean(plotDat[plotDat$nCelltypes == "4","Cetygo"])
+mean(plotDat[plotDat$nCelltypes == "5","Cetygo"])
+mean(plotDat[plotDat$nCelltypes == "6","Cetygo"])
+
+sd(plotDat[plotDat$nCelltypes == "3","Cetygo"])
+sd(plotDat[plotDat$nCelltypes == "4","Cetygo"])
+sd(plotDat[plotDat$nCelltypes == "5","Cetygo"])
+sd(plotDat[plotDat$nCelltypes == "6","Cetygo"])
 
 pdf("/mnt/data1/Thea/ErrorMetric/plots/badModels/violinnCelltypeModels.pdf", height = 6, width = 6)
 ggplot(plotDat, aes(x = as.factor(nCelltypes), y = Cetygo)) +
@@ -643,6 +681,13 @@ stackedWithNoise = ModelCompareStackedBar(testBetas = testData[[1]],
                                           nCpGPlot = F,
                                           sampleNamesOnPlots = T)
 
+### calc cor between missing prop sum and Cetygo
+dat = reshape(stackedWithNoise[[1]]$data, idvar = c("sample","error", "nCGmissing",  "model"),
+              timevar = "cellType", direction = "wide")
+dat$sums = 1-rowSums(dat[,5:10])
+cor(dat$error, dat$sums)
+
+
 ### Cetygo vs accuracy w noise
 library(reshape2)
 library(viridis)
@@ -736,6 +781,7 @@ load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix
 
 ## mean proportions of each cell type in whole blood (from Reinius2012)
 meanBloodProp = matrix(nrow = 1, byrow = T, data = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43))/100
+# meanBloodProp = matrix(nrow = 1, byrow = T, data = c(1/6,1/6, 1/6, 1/6, 1/6, 1/6))
 colnames(meanBloodProp) = levels(phenoTest$celltype)
 
 ## create a single representative sample
@@ -758,6 +804,7 @@ MakeNAsInBetas = function(proportionNA, betas){
 
 propMissing = seq(0,0.9,0.05)
 errorBlood = acc = c()
+propVals = c()
 for (i in 1:100){
   x = sapply(propMissing, MakeNAsInBetas, testDataBlood[[1]])
   rownames(x) = rownames(HousemanBlood50CpGModel$coefEsts)
@@ -766,6 +813,7 @@ for (i in 1:100){
                                   ownModelData = HousemanBlood50CpGModel)
   errorBlood = cbind(errorBlood, temp[,"error"])
   acc = cbind(acc, apply(temp[,1:6], 1, function(x){RMSE(x,testDataBlood[[2]])}))
+  propVals = cbind(propVals, x)
 }
 
 
@@ -1833,6 +1881,15 @@ ggplot(dat, aes(x = Celltype, y = diff, fill = Celltype)) +
         legend.position = "none") +
   labs(x = "Cell type", y = "Difference between simulated\nand predicted proportion")
 dev.off()
+
+
+## get median dif for each cell types
+
+for (i in 1:6){
+  print(levels(dat$Celltype)[i])
+  print(median(dat$diff[dat$Celltype == levels(dat$Celltype)[i]]))
+}
+
 
 # 
 # 

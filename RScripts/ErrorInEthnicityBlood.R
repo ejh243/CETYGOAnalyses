@@ -39,6 +39,9 @@ library(plyr)
 plotDat$Euro = revalue(as.factor(plotDat$Euro), c("TRUE" = "Yes", "FALSE" = "No"))
 plotDat$Euro = factor(plotDat$Euro, levels = c("Yes", "No"))
 
+
+save(plotDat, file = "/mnt/data1/Thea/ErrorMetric/data/plotDat/EthnicityData.Rdata") #?
+
 library(ggplot2)
 library(cowplot)
 
@@ -52,7 +55,7 @@ ggplot(plotDat, aes(x = Euro, y = Cetygo)) +
   geom_hline(yintercept = 0.1, linetype = "dashed", col = "red")
 dev.off()
 
-t.test(IoPPred[sample.annot$Euro,"error"], IoPPred[!sample.annot$Euro,"error"])
+t.test(IoPPred[sample.annot$Euro,"error"], IoPPred[!sample.annot$Euro,"error"])$p.value
 t.test(EUGEIPred[pheno$Euro,"error"], EUGEIPred[!pheno$Euro,"error"])
 
 
@@ -135,8 +138,11 @@ ggplot(allPheno, aes(x = as.numeric(as.character(age)), y = error, col = data)) 
   labs(y = "Cetygo", x = "Age", col = NULL)
 dev.off()
 
+load("/mnt/data1/Thea/ErrorMetric/data/plotDat/SexAgePlotDat.Rdata")
+
 x = t.test(allPheno[allPheno$sex == "Female","error"], allPheno[allPheno$sex == "Male","error"], alternative = "greater")
-# x=summary(lm(error~as.numeric(age), allPheno))
+x=summary(lm(error~as.numeric(age)+sex, allPheno))
+
 x = t.test(allPheno[which(as.numeric(allPheno$age) < 38-13.6 | as.numeric(allPheno$age) > 38+13.6),"error"], 
            allPheno[which(as.numeric(allPheno$age) > 38-13.6 | as.numeric(allPheno$age) < 38+13.6),"error"])
 
@@ -207,4 +213,31 @@ ggplot(plotDat, aes(x = variable, y = value, fill = sex)) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 15),
         legend.position = "bottom", legend.justification = "center")
 dev.off()
+
+#### batch plot ###
+load("/mnt/data1/Thea/ErrorMetric/data/plotDat/SexAgePlotDat.Rdata")
+
+library(ggplot2)
+library(cowplot)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/batchUSEXUEIOP.pdf", height = 5, width = 6)
+ggplot(allPheno, aes(x = data, y = error)) +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  geom_violin()+
+  theme_cowplot(18) +
+  theme(legend.position = "none") +
+  labs(x = "Dataset", y = "Cetygo") 
+dev.off()
+
+# t.test(allPheno[allPheno$data == "Understanding\nSociety", "error"], 
+#        allPheno[allPheno$data != "Understanding\nSociety", "error"])$p.value
+# 
+# t.test(allPheno[allPheno$data == "EXTEND", "error"], 
+#        allPheno[allPheno$data != "EXTEND", "error"])$p.value
+# 
+# t.test(allPheno[allPheno$data == "EUGEI", "error"], 
+#        allPheno[allPheno$data != "EUGEI", "error"])$p.value
+# 
+# t.test(allPheno[allPheno$data == "IoP", "error"], 
+#        allPheno[allPheno$data != "IoP", "error"])$p.value
 
