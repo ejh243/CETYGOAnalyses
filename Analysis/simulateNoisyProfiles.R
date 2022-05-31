@@ -1,6 +1,8 @@
-## run simulations to test resconstructed whole blood profiles with added noise
+## run simulations to test reconstructed whole blood profiles with added noise
 ## to avoid leakage don't normalise
 
+
+set.seed(9278)
 cellTypes.450k = c("Bcell", "CD4T", "CD8T", "Gran", "Mono", "NK")
 cellTypes.epic = c("Bcell", "CD4T", "CD8T", "Neu", "Mono", "NK")
 
