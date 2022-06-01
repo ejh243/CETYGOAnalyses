@@ -1,0 +1,2035 @@
+## Script to test error metric using Houseman data set
+## Dorothea Seiler Vellame
+## started 18-11-2020
+
+### Load data and assign training and testing #########
+library(minfi)
+library(wateRmelon)
+library(FlowSorted.Blood.450k)
+library("IlluminaHumanMethylation450kanno.ilmn12.hg19")
+
+compositeCellType = "Blood"
+platform<-"450k"
+referencePkg <- sprintf("FlowSorted.%s.%s", compositeCellType, platform)
+data(list = referencePkg)
+referenceRGset <- get(referencePkg)
+phenoDat = pData(referenceRGset)$CellType
+
+## only keep the 6 wanted cell types
+index = which(phenoDat == "Bcell" | 
+                phenoDat == "CD4T" | 
+                phenoDat == "CD8T" | 
+                phenoDat == "Gran" | 
+                phenoDat == "Mono" | 
+                phenoDat == "NK")
+phenoDat = as.factor(phenoDat[index]) 
+betas = referenceRGset[,index]
+
+## subset betas for those in EPIC only
+x = read.csv("/mnt/data1/EPIC_reference/MethylationEPIC_v-1-0_B4.csv", skip = 7, header = T)
+EPIC450kLoci = getAnnotation(betas)
+y = subsetByLoci(betas, includeLoci = rownames(EPIC450kLoci)[rownames(EPIC450kLoci) %in% x$IlmnID])
+
+
+## subset for those in EXTEND and Understanding Society
+load("/mnt/data1/EPICQC/UnderstandingSociety/US_Betas_Pheno.rda")
+us = dat
+load("/mnt/data1/EXTEND/Methylation/QC/EXTEND_batch1_2_merged/EXTEND_batches_1_2_normalised_together.rdat")
+ex = betas
+rm(pheno)
+
+USEXrows = rownames(us)[rownames(us) %in% rownames(ex)]
+EPIC450kLoci = getAnnotation(y)
+y = subsetByLoci(y, includeLoci = rownames(EPIC450kLoci)[rownames(EPIC450kLoci) %in% USEXrows])
+betas = y
+
+## split into training and testing and add to phenotype cols
+phenoTrain = c(rep("Test", length(phenoDat)))
+for(i in 1:length(levels(phenoDat))){
+  cellTypeIndex = which(phenoDat == levels(phenoDat)[i])
+  set.seed(125)
+  phenoTrain[sample(cellTypeIndex, length(cellTypeIndex)-1)] = "Train"
+}
+
+
+## save as RGset
+betasTrain = betas[,phenoTrain == "Train"]
+betasTest = betas[,phenoTrain == "Test"]
+pheno = data.frame(celltype = phenoDat, trainTest = phenoTrain)
+
+phenoTrain = pheno[pheno$trainTest == "Train",]
+phenoTest = pheno[pheno$trainTest == "Test",]
+
+save(betas, betasTrain, betasTest, pheno, file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestRGSet.Rdata")
+
+## save as matrix
+betas = getBeta(preprocessRaw(betas))
+betasTrain = getBeta(preprocessRaw(betasTrain))
+betasTest = getBeta(preprocessRaw(betasTest))
+save(betas, betasTrain, betasTest, pheno, phenoTrain, phenoTest,
+     file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+
+
+# ## quantile normalise together and apart
+# load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestRGSet.Rdata")
+# quantileBetasTrain = getBeta(preprocessQuantile(betasTrain, fixOutliers = TRUE,
+#                                                 removeBadSamples = TRUE, badSampleCutoff = 10.5,
+#                                                 quantileNormalize = TRUE, stratified = TRUE, 
+#                                                 mergeManifest = FALSE, sex = NULL))
+# quantileBetasTest = getBeta(preprocessQuantile(betasTest, fixOutliers = TRUE,
+#                                                removeBadSamples = TRUE, badSampleCutoff = 10.5,
+#                                                quantileNormalize = TRUE, stratified = TRUE, 
+#                                                mergeManifest = FALSE, sex = NULL))
+# quantileBetas = getBeta(preprocessQuantile(betas, fixOutliers = TRUE,
+#                                            removeBadSamples = TRUE, badSampleCutoff = 10.5,
+#                                            quantileNormalize = TRUE, stratified = TRUE, 
+#                                            mergeManifest = FALSE, sex = NULL))
+# ## save data
+# save(quantileBetasTrain, quantileBetasTest, quantileBetas, phenoTest, phenoTrain, pheno,
+#      file = "/mnt/data1/Thea/ErrorMetric/data/Houseman/quantileNormalisedBetasTrainTestMatrix.Rdata")
+
+
+### plot PCA of betas per cell type coloured by train test and heirarchical cluster ######
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+library(ggfortify)
+library(ggplot2)
+library(cowplot)
+library(scales)
+
+plotDat = list()
+colours = hue_pal()(6)
+for (i in 1:length(levels(pheno$celltype))){
+  dat = betas[, pheno$celltype == levels(pheno$celltype)[i]]
+  datPheno = pheno[pheno$celltype == levels(pheno$celltype)[i],]
+  betaVar = apply(dat, 1, var, na.rm = T)
+  topBeta = dat[order(betaVar, decreasing = T)[1:1000],]
+  plot = prcomp(t(topBeta)) 
+  plotDat[[i]] = autoplot(plot, col = colours[i], data = datPheno, shape = "trainTest", size = 2) + 
+    theme_cowplot(18) + 
+    ggtitle(levels(pheno$celltype)[i]) +
+    scale_shape_manual(values = c(21, 19)) +
+    theme(legend.position = "none")
+}
+
+plotsnoLeg = plot_grid(plotDat[[1]],
+                       plotDat[[2]],
+                       plotDat[[3]],
+                       plotDat[[4]],
+                       plotDat[[5]],
+                       plotDat[[6]],
+                       ncol = 2, labels = "AUTO")
+legplot = ggplot(data.frame(one = betas[1, 1:10], two = betas[2, 1:10], tt = rep(c("Train", "Test"), 5)),
+                 aes(x = one, y = two, shape = tt)) +
+  scale_shape_manual(values = c(21, 19)) +
+  geom_point(size = 2) +
+  labs(shape = "") +
+  theme_cowplot(18)
+
+
+png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellTrainTestPCA.png", height = 700, width = 550)
+plot_grid(plotsnoLeg, 
+          get_legend(legplot + theme(legend.justification="center" ,legend.position = "bottom")), 
+          ncol = 1,
+          rel_heights = c(2, 0.1))
+dev.off()
+
+## full PCA to show celltype similarity
+betaVar = apply(betas, 1, var, na.rm = T)
+topBeta = betas[order(betaVar, decreasing = T)[1:1000],]
+plotDatPCAFULL = autoplot(prcomp(t(topBeta)), data = pheno, col = "celltype", shape = "trainTest", size = 2) +
+  scale_shape_manual(values = c(21, 19)) +
+  labs(col = "Cell type", shape = "") +
+  theme_cowplot(18)
+
+png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/cellPCA.png",height = 450, width = 500)
+plotDatPCAFULL 
+dev.off()
+
+
+
+
+### Optimise number of CpGs ###########################
+## load unnormalised data
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+
+## source model functions
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+## make models
+modelListCpG = list()
+# cpg = c(1:25,seq(30,55,5), seq(60, 100, 10))
+cpg = 50
+for (i in 1:length(cpg)) {
+  modelListCpG[[i]] = pickCompProbes(rawbetas = as.matrix(betasTrain),
+                                     cellTypes = levels(as.factor(phenoTrain$celltype)),
+                                     cellInd = as.factor(phenoTrain$celltype),
+                                     numProbes =  cpg[i],
+                                     probeSelect = "auto")
+  names(modelListCpG)[i] = paste("model", cpg[i], "CG", sep = "")
+}
+#
+# ## save model list
+# save(modelListCpG, file = "/mnt/data1/Thea/ErrorMetric/data/nCpGModels/nCpGModels.Rdata")
+# 
+# load("/mnt/data1/Thea/ErrorMetric/data/nCpGModels/nCpGModels.Rdata")
+# library(reshape2)
+# 
+# ## predict value of test data for each model
+# cpg = c(1:25,seq(30,55,5), seq(60, 100, 10))
+# trueProp = singleCellProportionMatrix(phenoTest[,1])
+# rmseTvP = c()
+# 
+# # RMSE = function(m, o){
+# #   sqrt(mean((m - o)^2))
+# # }
+# 
+# 
+# for (i in 1:length(cpg)) {
+#   pred = projectCellTypeWithError(betasTest,  modelType = "ownModel", ownModelData = modelListCpG[[i]])
+#   rmseTvP = c(rmseTvP, mean(abs(melt(trueProp)[,3] - melt(pred[,-which(colnames(pred) %in% c("nCGmissing", "error"))])[,3])))
+# }
+# 
+# nCG = c()
+# for(i in 1:length(modelListCpG)){
+#   nCG = c(nCG, nrow(modelListCpG[[i]]$coefEsts))
+# }
+# 
+# 
+# corPlot = data.frame(rmseTvP, cpg, nCG)
+# 
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/nCpGNeededForModel.pdf", height = 7, width = 7)
+# ggplot(corPlot, aes(x = cpg, y = rmseTvP)) +
+#   geom_point() +
+#   theme_cowplot(18) +
+#   labs(x = expression(paste(italic("numProbes"))),
+#                       y = "Absolute difference between true and\npredicted cell type proportions")
+# dev.off()
+
+## save model that used 50 CpGs
+HousemanBlood50CpGModel = modelListCpG[[which(cpg == 50)]]
+save(HousemanBlood50CpGModel, file = "/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+
+
+
+### Check effect of normalisation #####################
+
+## load normalised Erisk for the phenofile then merge it
+library(bigmelon)
+library(gdsfmt)
+load("/mnt/data1/Eilis/Projects/Asthma/QC/CombinedQC_WithMarkdown/AllmsetEPIC.rdat")
+EriskGDS = es2gds(msetEPIC, file = "/mnt/data1/Thea/ErrorMetric/data/gds/ERISK.gds")
+# EriskGDS = openfn.gds("/mnt/data1/Thea/ErrorMetric/data/gds/ERISK.gds")
+
+Basename = pData(EriskGDS)$barcode
+
+EriskBetas = betas(EriskGDS)
+
+pheno = read.csv("/mnt/data1/Eilis/Projects/Asthma/QC/CombinedQC_WithMarkdown/CellSortedAsthmaERisk_SamplesPassedQC.csv")
+
+EriskBetas = EriskBetas[,which(Basename %in% pheno$Basename)]
+sum(colnames(EriskBetas ) == pheno$Basename)
+
+## predict cell proportions using my method
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+
+predOwn = projectCellTypeWithError(EriskBetas, "ownModel", HousemanBlood50CpGModel)
+
+
+## predict using watermelon
+source("/mnt/data1/Thea/wateRmelon/wateRmelon/R/estimateCellCounts.R")
+predWater = estimateCellCounts.wmln(msetEPIC, platform = "EPIC")
+
+predWater = predWater[which(rownames(predWater) %in% rownames(predOwn)),]
+
+rm(list = setdiff(ls(),c("pheno", "predOwn","predWater")))
+pheno = read.csv("/mnt/data1/Eilis/Projects/Asthma/QC/CombinedQC_WithMarkdown/CellSortedAsthmaERisk_SamplesPassedQC.csv")
+
+library(reshape2)
+Minfi = melt(pheno[,c("Basename", "Bcell","CD8T", "CD4T","Gran", "Mono","NK")], id.vars = "Basename")
+WateR = melt(cbind.data.frame(Basename = rownames(predWater), predWater), id.vars = "Basename")
+Own = melt(cbind.data.frame(Basename = rownames(predOwn), predOwn), id.vars = c("Basename","error","nCGmissing"))
+
+names(Minfi)[names(Minfi) =="value"] = "minfiPred"
+names(WateR)[names(WateR) =="value"] = "wateRPred"
+names(Own)[names(Own) =="value"] = "OwnPred"
+
+plotDat = merge(merge(Minfi, WateR, by = c("Basename", "variable")), Own, by = c("Basename", "variable"))
+
+library(ggplot2)
+library(cowplot)
+library(scales)
+library(viridis)
+
+colSub = hue_pal()(6)
+
+p1 = ggplot(plotDat, aes(x = OwnPred, y = minfiPred, col = error)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  geom_point() +
+  scale_color_viridis() +
+  theme_cowplot(18) +
+  labs(x = "Own prediction", y = "minfi prediction", col = "Cetygo")
+
+p2 = ggplot(plotDat, aes(x = OwnPred, y = wateRPred, col = error)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  geom_point() +
+  scale_color_viridis() +
+  theme_cowplot(18) +
+  labs(x = "Own prediction", y = "WateRmelon prediction", col = "Cetygo")
+
+p3 = ggplot(plotDat, aes(x = minfiPred, y = wateRPred, col = error)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  geom_point() +
+  theme_cowplot(18) +
+  scale_color_viridis() +
+  labs(x = "minfi prediction", y = "WateRmelon prediction", col = "Cetygo")
+
+p4 = get_legend(p1 )#+ theme(legend.direction =  "horizontal",
+#      legend.justification="center"))
+
+p5 = plot_grid(p1+theme(legend.position = "none"),
+               p2+theme(legend.position = "none"),
+               labels = c("A","B"),
+               ncol = 2)
+
+p6 = plot_grid(NULL,p3+theme(legend.position = "none"),p4,NULL,
+               ncol = 4,
+               labels = c("","C","",""), rel_widths = c(0.4,1,0.2,0.4))
+
+plot_grid(p1+theme(legend.position = "none"),
+          p2+theme(legend.position = "none"),
+          p3+theme(legend.position = "none"),
+          p4,labels = c("A","B","C",""),
+          ncol = 4, rel_widths = c(1,1,1,0.2))
+
+png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/WatermelonMinfiOwnNormComparison.png", height = 550, width = 550)
+plot_grid(p5,p6,ncol = 1)
+dev.off()
+
+
+
+### Plot heirarchical cluster of training cpgs used in model #####
+## load model
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+
+## load data
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+
+## load functions
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+modelBetas = GetModelCG(betasTrain, list(HousemanBlood50CpGModel))
+library(gplots)
+library(viridis)
+library(scales)
+library(ComplexHeatmap)
+
+# colours6 = hue_pal()(6)
+
+col = list(Celltype = c("Bcell" = "#F8766D", "CD4T" = "#B79F00",
+                        "CD8T" = "#00BA38",  "Gran" = "#00BFC4",
+                        "Mono" = "#619CFF",  "NK" = "#F564E3"))
+# Create the heatmap annotation
+ha <- HeatmapAnnotation(Celltype = phenoTrain$celltype,
+                        col = col)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/heatmapForModelCpGs.pdf", height = 6, width = 5)
+Heatmap(modelBetas, name = "DNAm",
+        top_annotation = ha, show_row_names = F, show_column_names = F, show_row_dend = F)
+dev.off()
+
+### plot PCA of model CpGs ############################
+## full PCA to show celltype similarity
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+
+library(ggfortify)
+library(ggplot2)
+library(cowplot)
+library(scales)
+
+pheno = data.frame(celltype = colnames(HousemanBlood50CpGModel$coefEsts))
+
+plotDatPCAFULL = autoplot(prcomp(t(HousemanBlood50CpGModel$coefEsts)),
+                          data = pheno, col = "celltype", size = 3) +
+                  theme_cowplot(18)
+
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.pdf",height = 6, width = 6)
+png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.png",height = 450, width = 500)
+plotDatPCAFULL +
+  labs(col = "Cell type")
+dev.off()
+
+
+p2 = autoplot(prcomp(t(HousemanBlood50CpGModel$coefEsts)),
+         data = pheno, col = "celltype", size = 3, x = 3, y = 4) +
+  theme_cowplot(18) +
+  labs(col = "Cell type")
+
+p1 = autoplot(prcomp(t(HousemanBlood50CpGModel$coefEsts)),
+         data = pheno, col = "celltype", size = 3, x = 1, y = 2) +
+  theme_cowplot(18) +
+  labs(col = "Cell type")
+
+leg = get_legend(p1+ theme(legend.position = "bottom"))
+
+
+png("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/modelCpGPCA.png",
+    height = 650, width = 350)
+plot_grid(p1 + theme(legend.position = "none"), 
+          p2 + theme(legend.position = "none"), 
+          leg, ncol = 1, rel_heights = c(1,1,0.3))
+
+dev.off()
+
+
+### Create models using 3:6 cell types ################
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+## load data
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+
+## make design matrix of booleans for which cell type will be present
+designMatrix = expand.grid(c(T,F), c(T,F), c(T,F), c(T,F), c(T,F), c(T,F))
+designMatrix = designMatrix[apply(designMatrix, 1, sum) >= 3,]
+
+cellTypes = c("Bcell", "CD4T", "CD8T", "Gran", "Mono", "NK")
+cellTypeShorthand = c("B", "C4", "C8", "G", "M", "NK")
+
+# modelList = list()
+# for (i in 1:nrow(designMatrix)){
+#   modellingDat = CellTypeSubsetBetasAndPheno(cellTypes[unlist(designMatrix[i,])],
+#                                              betasTrain, phenoTrain, phenoColName = "celltype", justBetas = F)
+#   modelList[[i]] = pickCompProbes(rawbetas = as.matrix(modellingDat[[1]]),
+#                                   cellTypes = levels(as.factor(as.character(modellingDat[[2]]$celltype))),
+#                                   cellInd = as.factor(as.character(modellingDat[[2]]$celltype)),
+#                                   numProbes = 50,
+#                                   probeSelect = "auto")
+#   names(modelList)[i] = paste("model", paste(cellTypeShorthand[unlist(designMatrix[i,])], sep = "", collapse = ""), sep = "_")
+# }
+# 
+# save(modelList, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+
+# load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+
+# ## mean proportions of each cell type in whole blood (from Reinius2012)
+# meanBloodProp = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43)
+# sdBloodProp = c(1.44, 3.12, 3.13, 9.19, 3.17, 1.5)
+# 
+# # each cell type will be simulated with mean, mean +- sd, mean +- 2sd
+
+## simulate data in stratified way
+# bulk = simPropMaker3(model = modelList, testBetas = betasTest, pheno = phenoTest$celltype, modelList = T)
+
+
+# bulk = CellTypeProportionSimulator(GetModelCG(betasTest, modelList),
+#                             phenoTest,
+#                             phenoColName = "celltype",
+#                             nBulk = 30,
+#                             proportionsMatrixType = "own",
+#                             proportionsMatrix = simPropMaker(meanBloodProp, sdBloodProp))
+
+# stackedPlots = ModelCompareStackedBar(bulk[[1]],
+#                            modelList,
+#                            nCpGPlot = F,
+#                            sampleNamesOnPlots = F,
+#                            trueComparison = T,
+#                            trueProportions = bulk[[2]])
+
+# predBulk = list()
+# for (i in 1:length(modelList)){
+#   predBulk[[i]] = projectCellTypeWithError(bulk[[1]], modelType = "ownModel", ownModelData = modelList[[i]])
+# }
+
+
+# save(modelList, bulk, stackedPlots, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+# save(modelList, bulk, predBulk, file = "/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+
+
+load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+
+plotDat = as.data.frame(matrix(nrow = 0, ncol = 3))
+for (i in 1:length(modelList)){
+  plotDat = rbind.data.frame(plotDat, cbind.data.frame(1:2823, predBulk[[i]][,"error"], names(modelList)[i]))
+}
+colnames(plotDat) = c("Sample", "Cetygo", "Model")
+
+
+
+## add columns for which cell types in each data set and then compare specific models
+modelPresent = matrix(ncol = length(cellTypes), nrow = 42, data = 0)
+colnames(modelPresent) = paste(cellTypeShorthand, "cell")
+
+
+for(i in 1:6){
+  modelPresent[grep(cellTypeShorthand[i],names(modelList)),i] = 1
+}
+
+y = rowSums(modelPresent)
+x = cbind.data.frame(nCelltypes = y, Model = names(modelList))
+
+plotDat = merge(plotDat, x, by = "Model")
+
+## get plot stats
+range(plotDat[plotDat$nCelltypes == "3","Cetygo"])
+range(plotDat[plotDat$nCelltypes == "4","Cetygo"])
+range(plotDat[plotDat$nCelltypes == "5","Cetygo"])
+range(plotDat[plotDat$nCelltypes == "6","Cetygo"])
+
+mean(plotDat[plotDat$nCelltypes == "3","Cetygo"])
+mean(plotDat[plotDat$nCelltypes == "4","Cetygo"])
+mean(plotDat[plotDat$nCelltypes == "5","Cetygo"])
+mean(plotDat[plotDat$nCelltypes == "6","Cetygo"])
+
+sd(plotDat[plotDat$nCelltypes == "3","Cetygo"])
+sd(plotDat[plotDat$nCelltypes == "4","Cetygo"])
+sd(plotDat[plotDat$nCelltypes == "5","Cetygo"])
+sd(plotDat[plotDat$nCelltypes == "6","Cetygo"])
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/badModels/violinnCelltypeModels.pdf", height = 6, width = 6)
+ggplot(plotDat, aes(x = as.factor(nCelltypes), y = Cetygo)) +
+  geom_violin() +
+  theme_cowplot(18) +
+  labs(x = "Number of cell types in the model", y = "Cetygo") +
+  ylim(c(0, max(plotDat$Cetygo))) +
+  theme(legend.position = "none") 
+dev.off() 
+
+
+
+
+## general Q: 
+## why do some still predict well? low proportion of that cell type? cell type less important?
+
+## compare those with only 5 to simplify the question
+library(plyr)
+plotDat5 = plotDat[plotDat$nCelltypes == 5, ]
+plotDat5$mod = factor(unlist(strsplit(as.character(plotDat5$Model), "l_"))[seq(2,nrow(plotDat5)*2,2)],
+                      levels = c("C4C8GMNK", "BC8GMNK", "BC4GMNK", "BC4C8MNK", "BC4C8GNK", "BC4C8GM"))
+
+
+plotDat5$cMissing = revalue(plotDat5$mod, c("C4C8GMNK" = "Bcell",
+                                            "BC8GMNK" = "CD4T", 
+                                            "BC4GMNK" = "CD8T", 
+                                            "BC4C8MNK" = "Gran", 
+                                            "BC4C8GNK" = "Mono",
+                                            "BC4C8GM" = "NK"))
+
+## violin plot of 5 cell types only
+pdf("/mnt/data1/Thea/ErrorMetric/plots/badModels/violin5CelltypeModels.pdf", height = 6, width = 6)
+ggplot(plotDat5, aes(x = cMissing, y = Cetygo, fill = cMissing)) +
+  geom_violin() +
+  theme_cowplot(18) +
+  labs(x = "Missing cell type in model", y = "Cetygo") +
+  ylim(c(0, max(plotDat5$Cetygo))) +
+  theme(legend.position = "none", 
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+dev.off()
+
+
+model5Index = which(rowSums(designMatrix) == 5)
+models5 = modelList[model5Index]
+
+wantedModelNames = c("Bcell missing", "CD4T missing", "CD8T missing",
+                     "Gran missing", "Mono missing", "NK missing")
+names(models5) = wantedModelNames
+
+## for each cell type, plot stacked bar of true and actual and error for their own simulated data 
+meanBloodProp = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43)
+models5Compared = list()
+for (i in 1:6){
+  celltypePreBool = 1:6
+  bulkProp = simPropMaker2(meanBloodProp, celltypeBool = celltypePreBool == i, cellNames = cellTypes)
+  
+  #pretend there are two cell purified samples in test or function breaks
+  bulk = CellTypeProportionSimulator(GetModelCG(cbind(betasTest,betasTest), list(models5[[i]])),
+                                     rbind.data.frame(phenoTest, phenoTest),
+                                     phenoColName = "celltype",
+                                     nBulk = nrow(bulkProp),
+                                     proportionsMatrixType = "own",
+                                     proportionsMatrix = bulkProp)
+  model = list(models5[[i]])
+  names(model) = wantedModelNames[i]
+  models5Compared[[i]] = ModelCompareStackedBar(bulk[[1]], 
+                                                modelList = model, 
+                                                trueComparison = T,
+                                                noise = F,
+                                                trueProportions = bulk[[2]],
+                                                nCpGPlot = F,
+                                                sampleNamesOnPlots = T)
+}
+
+for(i in 1:6){
+  leg = get_legend(models5Compared[[i]][[3]]
+                   + theme(legend.justification = "centre",legend.direction = "horizontal", legend.title = element_blank())
+                   + guides(fill = guide_legend(nrow = 1)))
+  plots = plot_grid(models5Compared[[i]][[1]] + 
+                      theme(legend.position = "none", 
+                            axis.title.x=element_blank(),
+                            axis.text.x=element_blank(),
+                            axis.ticks.x=element_blank()) +
+                      xlab(element_blank()),
+                    models5Compared[[i]][[2]] + 
+                      theme(legend.position = "none",
+                            axis.title.x=element_blank(),
+                            axis.text.x=element_blank(),
+                            axis.ticks.x=element_blank()) +
+                      scale_y_continuous(breaks=c(0, 0.25, 0.50, 0.75,1)) +
+                      xlab(element_blank()),
+                    models5Compared[[i]][[3]] + 
+                      theme(legend.position = "none", 
+                            axis.text.x = element_text(angle = 0, vjust = 0, hjust=0.5))+
+                      scale_y_continuous(breaks=c(0, 0.25, 0.50, 0.75,1)) +
+                      scale_x_discrete(labels = c("Sa" = "0.1",
+                                                  "Sb" = "0.2",
+                                                  "Sc" = "0.3",
+                                                  "Sd" = "0.4",
+                                                  "Se" = "0.5",
+                                                  "Sf" = "0.6",
+                                                  "Sg" = "0.7",
+                                                  "Sh" = "0.8",
+                                                  "Si" = "0.9",
+                                                  "Sj" = "1.0"))+
+                      xlab(paste("Simulated proportion of", strsplit(wantedModelNames[i], " ")[[1]][1])),
+                    ncol = 1,
+                    rel_heights = c(0.6,1,1.2), labels = "AUTO", axis = "rl", align = "v" )
+  
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+  
+  
+  # pdf(paste("/mnt/data1/Thea/ErrorMetric/plots/badModels/stackedBar5cell",cellTypes[i],"missing.pdf", sep = ""), height = 9, width = 7)     
+  png(paste("/mnt/data1/Thea/ErrorMetric/plots/badModels/stackedBar5cell",
+            cellTypes[i],"missing.png", sep = ""), height = 800, width = 600)     
+  print(plot_grid(plots, leg, ncol = 1, rel_heights = c(1,0.08)))
+  dev.off()
+}
+
+
+## plot error metrics for each 10 samples together to highlight the difference in magnitude
+erPlotDat = models5Compared[[1]][[1]]$data
+for (i in 2:6){
+  erPlotDat = rbind.data.frame(erPlotDat, models5Compared[[i]][[1]]$data)
+}
+
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/badModels/errorOnly5Celltypes.pdf", height = 4, width = 7)
+png("/mnt/data1/Thea/ErrorMetric/plots/badModels/errorOnly5Celltypes.png", height = 450, width = 600)
+ggplot(erPlotDat, aes(x = sample, y = error, col = model)) +
+  geom_point(size = 2.5) +
+  theme_cowplot(18) +
+  # theme(axis.text.x=element_blank(),
+  # axis.ticks.x=element_blank()) +
+  scale_x_discrete(labels = c("Sa" = "0.1",
+                              "Sb" = "0.2",
+                              "Sc" = "0.3",
+                              "Sd" = "0.4",
+                              "Se" = "0.5",
+                              "Sf" = "0.6",
+                              "Sg" = "0.7",
+                              "Sh" = "0.8",
+                              "Si" = "0.9",
+                              "Sj" = "1.0")) +
+  labs(x = "Simulated proportion of\nmissing cell type", y = "Cetygo", col = "Model") +
+  ylim(c(0, max(erPlotDat$error)))
+dev.off()
+
+
+
+
+
+### Compare error when noise is introduced ############
+
+## load functions
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+## load model
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+
+## load testing data
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+
+## mean proportions of each cell type in whole blood (from Reinius2012)
+meanBloodProp = matrix(nrow = 1, byrow = T, data = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43))
+colnames(meanBloodProp) = levels(phenoTest$celltype)
+
+noise = seq(0,0.95,0.05)
+
+## create simulated samples with increasing noise
+testData = CellTypeProportionSimulator(betas = cbind(betasTest,betasTest),
+                                       pheno = rbind.data.frame(phenoTest, phenoTest),
+                                       phenoColName = "celltype", 
+                                       nBulk = length(noise), 
+                                       proportionsMatrixType = "own",
+                                       proportionsMatrix = meanBloodProp,
+                                       noiseIn = T,
+                                       proportionNoise = noise)
+
+
+stackedWithNoise = ModelCompareStackedBar(testBetas = testData[[1]], 
+                                          modelList = list(Predicted = HousemanBlood50CpGModel), 
+                                          trueComparison = T,
+                                          noise = T,
+                                          trueProportions = testData[[2]],
+                                          nCpGPlot = F,
+                                          sampleNamesOnPlots = T)
+
+### calc cor between missing prop sum and Cetygo
+dat = reshape(stackedWithNoise[[1]]$data, idvar = c("sample","error", "nCGmissing",  "model"),
+              timevar = "cellType", direction = "wide")
+dat$sums = 1-rowSums(dat[,5:10])
+cor(dat$error, dat$sums)
+
+
+### Cetygo vs accuracy w noise
+library(reshape2)
+library(viridis)
+dat1 = dcast(as.data.frame(stackedWithNoise[[1]]$data), sample + error ~cellType, value.var = proportion_pred)
+dat2 = dcast(as.data.frame(stackedWithNoise[[3]]$data), sample ~cellType, value.var = proportion_pred)
+dat = cbind.data.frame(dat1, dat2)
+
+dat1$rmse = apply(dat, 1, function(x){sqrt(mean(as.numeric(x[3:8])- as.numeric(x[10:15]))^2)})
+dat1$noise = dat2$Noise
+
+cor(dat1$rmse, dat1$error)
+
+png("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithNoiseCetygoVSAcc.png", height = 400, width = 450)  
+ggplot(dat1, aes(x = rmse, y = error, col = noise)) +
+  geom_point(size = 2.5) +
+  theme_cowplot(18) +
+  labs(x = "RMSE of predicted and actual\nproportions", y = "Cetygo", col = "Noise") +
+  scale_color_viridis()
+dev.off()  
+
+## stats
+min(stackedWithNoise[[1]]$data$error)
+max(stackedWithNoise[[1]]$data$error)
+
+leg = get_legend(stackedWithNoise[[3]]
+                 + theme(legend.justification = "centre",legend.direction = "horizontal", legend.title = element_blank())
+                 + guides(fill = guide_legend(nrow = 1)))
+plots = plot_grid(stackedWithNoise[[1]] + 
+                    theme(legend.position = "none", 
+                          axis.title.x=element_blank(),
+                          axis.text.x=element_blank(),
+                          axis.ticks.x=element_blank()) +
+                    xlab(element_blank()),
+                  stackedWithNoise[[2]] + 
+                    theme(legend.position = "none",
+                          axis.title.x=element_blank(),
+                          axis.text.x=element_blank(),
+                          axis.ticks.x=element_blank()) +
+                    xlab(element_blank()),
+                  stackedWithNoise[[3]] + 
+                    theme(legend.position = "none", 
+                          axis.text.x = element_text(angle = 0, vjust = 0, hjust=0.5))+
+                    scale_x_discrete(labels = c("Sa" = "0",
+                                                "Sb" = " ",
+                                                "Sc" = "0.1",
+                                                "Sd" = " ",
+                                                "Se" = "0.2",
+                                                "Sf" = " ",
+                                                "Sg" = "0.3",
+                                                "Sh" = " ",
+                                                "Si" = "0.4",
+                                                "Sj" = " ",
+                                                "Sk" ="0.5", 
+                                                "Sl" = " ", 
+                                                "Sm" ="0.6", 
+                                                "Sn" =" ",
+                                                "So" ="0.7",
+                                                "Sp" =" ",
+                                                "Sq" ="0.8",
+                                                "Sr" =" ",
+                                                "Ss" ="0.9",
+                                                "St" =" "))+
+                    xlab("Simulated proportion of noise"),
+                  ncol = 1,
+                  rel_heights = c(0.6,1,1.3), labels = "AUTO", axis = "rl", align = "v" )
+
+# plots = plot_grid(stackedWithNoise[[1]] + theme(legend.position = "none"),
+#                   stackedWithNoise[[2]] + theme(legend.position = "none"),
+#                   stackedWithNoise[[3]] + theme(legend.position = "none"), ncol = 1,
+#                   rel_heights = c(0.6,1,1), labels = "AUTO", axis = "rl", align = "v" )
+
+
+png("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithNoise.png", height = 800, width = 600)     
+print(plot_grid(plots, leg, ncol = 1, rel_heights = c(1,0.08)))
+dev.off()
+
+
+
+### Check increasing missingness of CpGs ##############
+## load functions
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+## load model (and brain model)
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+# load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
+
+## load testing data
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+
+## mean proportions of each cell type in whole blood (from Reinius2012)
+meanBloodProp = matrix(nrow = 1, byrow = T, data = c(3.01,13.4, 6.13, 64.9, 5.4, 2.43))/100
+# meanBloodProp = matrix(nrow = 1, byrow = T, data = c(1/6,1/6, 1/6, 1/6, 1/6, 1/6))
+colnames(meanBloodProp) = levels(phenoTest$celltype)
+
+## create a single representative sample
+testDataBlood = CellTypeProportionSimulator(betas = GetModelCG(cbind(betasTest,betasTest), list(HousemanBlood50CpGModel)),
+                                            pheno = rbind.data.frame(phenoTest, phenoTest), 
+                                            phenoColName = "celltype", 
+                                            nBulk = 1, 
+                                            proportionsMatrixType = "own",
+                                            proportionsMatrix = meanBloodProp,
+                                            noiseIn = F)
+
+
+## create function to add x NAs to betas
+MakeNAsInBetas = function(proportionNA, betas){
+  nToBeNA = floor(nrow(betas)*proportionNA)
+  NAIndex = sample(nrow(betas), nToBeNA)
+  betas[NAIndex,] = NA
+  return(betas)
+}
+
+propMissing = seq(0,0.9,0.05)
+errorBlood = acc = c()
+propVals = c()
+for (i in 1:100){
+  x = sapply(propMissing, MakeNAsInBetas, testDataBlood[[1]])
+  rownames(x) = rownames(HousemanBlood50CpGModel$coefEsts)
+  temp = projectCellTypeWithError(YIN = x, 
+                                  modelType = "ownModel",
+                                  ownModelData = HousemanBlood50CpGModel)
+  errorBlood = cbind(errorBlood, temp[,"error"])
+  acc = cbind(acc, apply(temp[,1:6], 1, function(x){RMSE(x,testDataBlood[[2]])}))
+  propVals = cbind(propVals, x)
+}
+
+
+
+plotDat = cbind.data.frame(errorBlood, propMissing = seq(0,0.9,0.05))
+acc = as.data.frame(acc)
+plotDat$propMissing = acc$propMissing = as.factor(plotDat$propMissing) 
+
+library(reshape2)
+pd = cbind.data.frame(melt(plotDat, id.vars = "propMissing"), 
+                      melt(acc, id.vars = "propMissing"))
+colnames(pd) = c("propMissing", "x", "error", "propMissing2", "y", "RMSE")
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithMissingCpGs.pdf", height = 4, width = 5.5) 
+ggplot(pd, aes(x = propMissing, y = error)) +
+  geom_violin() +
+  theme_cowplot(18) +
+  scale_x_discrete(breaks=c(0, 0.25, 0.50, 0.75)) +
+  labs(x = "Proportion of sites missing", y = "Cetygo") +
+  theme(legend.position = "none")
+dev.off()
+
+library(viridis)
+png("/mnt/data1/Thea/ErrorMetric/plots/badData/simWithMissingCpGsACCVSCETygo.png", height = 400, width = 450)
+ggplot(pd, aes(x = RMSE, y = error, col = as.numeric(as.character(propMissing)))) +
+  theme_cowplot(18)+
+  geom_point() +
+  labs(x = "RMSE of predicted and actual\nproportions", y = "Cetygo", col = "Proportion\nmissing") +
+  scale_color_viridis()
+dev.off()
+
+### Check effect of age, sex in EXTEND and US #########
+## load model
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+model =  HousemanBlood50CpGModel
+
+## load functions
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+## load libraries
+library(ggplot2)
+library(cowplot)
+
+## load data
+load("/mnt/data1/EPICQC/UnderstandingSociety/US_Betas_Pheno.rda")
+us = dat
+usPheno = pheno
+load("/mnt/data1/EXTEND/Methylation/QC/EXTEND_batch1_2_merged/EXTEND_batches_1_2_normalised_together.rdat")
+ex = betas
+exPheno = pheno
+rm(dat, betas, pheno, HousemanBlood50CpGModel)
+
+## get error for US
+usPred = projectCellTypeWithError(us, modelType = "ownModel", ownModelData = model)
+
+## get error for EX
+exPred = projectCellTypeWithError(ex, modelType = "ownModel", ownModelData = model)
+
+sexUS = usPheno$nsex
+sexUS = ifelse(sexUS =="1", "Male", "Female")
+allPheno = rbind.data.frame(cbind.data.frame(usPred, data = "US", age = usPheno$confage, sex = sexUS),
+                            cbind.data.frame(exPred, data = "EX", age = exPheno$Age, sex = exPheno$Sex))
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/sexAcrossEXandUS.pdf", height = 7, width = 7) 
+ggplot(allPheno, aes(x = data, y = error, fill = sex)) +
+  geom_violin() +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  theme_cowplot(18) +
+  labs(y = "Cetygo", x = "Dataset", fill = "Sex")
+dev.off()
+
+x=summary(lm(error~as.numeric(age), allPheno))
+
+## create age from 38 phenotype
+# allPheno$ageDiff = abs(as.numeric(as.character(allPheno$age))-38)
+
+## load reference data ages
+# load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+# library(minfi)
+# library(wateRmelon)
+# library(FlowSorted.Blood.450k)
+# library("IlluminaHumanMethylation450kanno.ilmn12.hg19")
+# 
+# compositeCellType = "Blood"
+# platform<-"450k"
+# referencePkg <- sprintf("FlowSorted.%s.%s", compositeCellType, platform)
+# data(list = referencePkg)
+# referenceRGset <- get(referencePkg)
+# phenoDat = pData(referenceRGset)
+# 
+# phenoDat
+
+# library(GEOquery)
+# gse <- getGEO('GSE35069',GSEMatrix=TRUE)
+# pheno <- pData(phenoData(gse[[1]]))
+
+## Age of test data not available, only mean and SD, so plot those!
+
+library(scales)
+colToUse = hue_pal()(4)[c(2,4)]
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/ageAcrossEXandUS.pdf", height = 7, width = 7) 
+ggplot(allPheno, aes(x = as.numeric(as.character(age)), y = error, col = data)) +
+  geom_point() +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  geom_vline(xintercept = c(38-13.6, 38+13.6), linetype = "dashed") +
+  geom_vline(xintercept = 38) +
+  scale_color_manual(values = colToUse) +
+  theme_cowplot(18) +
+  labs(y = "Cetygo", x = "Age", col = "Dataset")
+dev.off()
+
+x = t.test(allPheno[allPheno$sex == "Female","error"], allPheno[allPheno$sex == "Male","error"], alternative = "greater")
+
+# summary(lm(error ~ ageDiff, data = allPheno))
+
+
+### check annotation of model CpGs to chromosomes #####
+x = read.csv("/mnt/data1/EPIC_reference/MethylationEPIC_v-1-0_B4.csv", skip = 7, header = T)
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+
+x = x[,c("IlmnID", "CHR")]
+cpgInMod = x[x$IlmnID %in% rownames(HousemanBlood50CpGModel$coefEsts),]
+table(cpgInMod$CHR)
+
+save(cpgInMod, file = "/mnt/data1/Thea/ErrorMetric/data/cpgInModel.Rdata")
+
+### compare X chromosome in model between male and female in EX and US ####
+load("/mnt/data1/Thea/ErrorMetric/data/cpgInModel.Rdata")
+load("/mnt/data1/EPICQC/UnderstandingSociety/US_Betas_Pheno.rda")
+us = dat
+usPheno = pheno
+load("/mnt/data1/EXTEND/Methylation/QC/EXTEND_batch1_2_merged/EXTEND_batches_1_2_normalised_together.rdat")
+ex = betas
+exPheno = pheno
+rm(dat, betas, pheno)
+
+exT = ex[rownames(ex) %in% cpgInMod$IlmnID,]
+usT = us[rownames(us) %in% cpgInMod$IlmnID,]
+
+exT = exT[match(cpgInMod$IlmnID, rownames(exT)),]
+usT = usT[match(cpgInMod$IlmnID, rownames(usT)),]
+
+all(rownames(exT) == cpgInMod$IlmnID)
+all(rownames(usT) == cpgInMod$IlmnID)
+
+## subset for those in the x chromosome
+exT = exT[cpgInMod$CHR == "X",]
+usT = usT[cpgInMod$CHR == "X",]
+
+sexUS = usPheno$nsex
+sexUS = ifelse(sexUS =="1", "Male", "Female")
+
+plotDat = rbind.data.frame(data.frame(t(exT), sampleID = colnames(exT), study = "EX", sex = exPheno$Sex),
+                           data.frame(t(usT), sampleID = colnames(usT), study = "US", sex = sexUS))
+
+statDat = data.frame(matrix(nrow = ncol(plotDat)-3, ncol = 5))
+colnames(statDat) = c("CpG", "pValue", "Sig", "meanF", "meanM")
+for (i in 1:(ncol(plotDat)-3)){
+  x = t.test(plotDat[,i]~plotDat[,"sex"])
+  statDat[i,1] = colnames(plotDat)[i]
+  statDat[i,2] = signif(x$p.value, 2)
+  statDat[i,4:5] = signif(x$estimate, 3)
+}
+statDat$Sig[statDat$pValue >= 0.05] = ""
+statDat$Sig[statDat$pValue < 0.05] = "."
+statDat$Sig[statDat$pValue < 0.01] = "*"
+statDat$Sig[statDat$pValue < 0.001] = "**"
+statDat$Sig[statDat$pValue < 0.0001] = "***"
+
+
+library(xtable)
+print(xtable(statDat), include.rownames=FALSE)
+
+library(reshape2)
+plotDat = melt(plotDat, id.vars = c("study", "sex", "sampleID"))
+
+library(ggplot2)
+library(cowplot)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/ErrorXchrCpGsInEXUS.pdf", height = 8, width = 14)
+ggplot(plotDat, aes(x = variable, y = value, fill = sex)) +
+  theme_cowplot(18) +
+  geom_violin(position=position_dodge(0.5)) +
+  facet_wrap(~study, ncol = 1) +
+  labs(y = "Proportion of methylation", fill = "Sex", x = "X chromosome CpGs") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 15))
+dev.off()
+
+
+
+
+### Plot outputs from Essex data ######################
+
+# ## Essex server code:
+# ## open gds file
+# library(gdsfmt)
+# x = openfn.gds("/storage/st05d/deepmelon/GEOClod.gds", readonly=TRUE, allow.duplicate=FALSE, allow.fork=FALSE)
+# 
+# 
+# betas = read.gdsn(index.gdsn(x, "rawbetas"))
+# #dim(betas)
+# 
+# load("~/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+# 
+# pID = read.gdsn(index.gdsn(index.gdsn(x$root, "fData"), "Probe_ID"))
+# betaIndex = pID %in% rownames(HousemanBlood50CpGModel$coefEsts)
+# 
+# rownames(betas) = read.gdsn(index.gdsn(index.gdsn(x$root, "fData"), "Probe_ID"))
+# colnames(betas) = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "FullBarCode"))
+# 
+# betaMod = betas[betaIndex,]
+# betaMod = betaMod[match(rownames(HousemanBlood50CpGModel$coefEsts), rownames(betaMod)),]
+# 
+# ## create column index, removing samples that have "", or unsorted
+# tDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "Tissue"))
+# aDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "Age"))
+# sDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "Sex"))
+# dDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "DatasetOrigin"))
+# stDat = read.gdsn(index.gdsn(index.gdsn(x$root, "pData"), "SubTissue"))
+# tInd = which(tDat == "" |
+#                tDat == "Unsorted Tissues" |
+#                tDat == "Unsorted Cell Line" |
+#                tDat == "Unsorted Tumours")
+# 
+# betaMod = betaMod[,-tInd]
+# 
+# gfile = createfn.gds("sub.gds")
+# 
+# add.gdsn(gfile, "Age", aDat[-tInd])
+# add.gdsn(gfile, "Sex", sDat[-tInd])
+# add.gdsn(gfile, "Tissue", tDat[-tInd])
+# add.gdsn(gfile, "DatasetOrigin", dDat[-tInd])
+# add.gdsn(gfile, "SubTissue", stDat[-tInd])
+# add.gdsn(gfile, "rownames", rownames(betaMod))
+# add.gdsn(gfile, "colnames", colnames(betaMod))
+# 
+# #source("~/DSRMSE/FunctionsForErrorTesting.R")
+# source("~/DSRMSE/projectCellTypeWithError.R")
+# model = HousemanBlood50CpGModel
+# 
+# ind = c(seq(1000, 20960, 1000))
+# errPred = lapply(ind, function(ind){
+#   pred = projectCellTypeWithError(betaMod[,(ind - 999):ind], model = "ownModel", ownModelData = model)
+#   return(pred)})
+# 
+# errPred[[length(errPred)+1]] = projectCellTypeWithError(betaMod[,20001:20960], model = "ownModel", ownModelData = model)
+# 
+# ## extract all from list and add to gds file
+# pred = errPred[[1]]
+# for (i in 2:length(errPred)){
+#   pred = rbind(pred, errPred[[i]])
+# }
+# 
+# add.gdsn(gfile, "Pred", pred)
+# closefn.gds(gfile)
+# closefn.gds(x)
+# q()
+# 
+# scp sub.gds dSeiler@knight.ex.ac.uk:/mnt/data1/Thea/ErrorMetric/data/EssexOutput/
+
+
+## open gds and make into matrix
+library(gdsfmt)
+gfile = openfn.gds("/mnt/data1/Thea/ErrorMetric/data/EssexOutput/sub.gds")
+
+dat = cbind.data.frame(read.gdsn(index.gdsn(gfile$root, "Pred")),
+                       Age = read.gdsn(index.gdsn(gfile$root, "Age")),
+                       Sex = read.gdsn(index.gdsn(gfile$root, "Sex")),
+                       Tissue = read.gdsn(index.gdsn(gfile$root, "Tissue")),
+                       SubTissue = read.gdsn(index.gdsn(gfile$root, "SubTissue")),
+                       Sample = read.gdsn(index.gdsn(gfile$root, "colnames")),
+                       DatasetOrigin = read.gdsn(index.gdsn(gfile$root, "DatasetOrigin")))
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+colnames(dat)[1:8] = c(colnames(HousemanBlood50CpGModel$coefEsts), "error", "nCGmissing")
+
+## remove the .gds from DatasetOrigin
+dat$DatasetOrigin = as.factor(unlist(strsplit(as.character(dat$DatasetOrigin), ".g"))[seq(1,nrow(dat)*2,2)])
+
+## remove samples withmissing CpGs
+dat = dat[dat$nCGmissing ==0,]
+
+## create a Blood Bool to colour by
+dat$blood = rep(0, nrow(dat))
+dat$blood[dat$Tissue == "Blood" |
+            dat$Tissue == "B Cells" |
+            dat$Tissue == "Granulocyes" |
+            dat$Tissue == "Neutrophils" |
+            dat$Tissue == "NK" |
+            dat$Tissue == "Lymph Node" |
+            dat$Tissue == "T Cells"] = 1
+
+## merge bloods for plot
+dat$TissueBlood = dat$Tissue
+dat$TissueBlood[dat$Tissue == "Blood" |
+                  dat$Tissue == "B Cells" |
+                  dat$Tissue == "Granulocyes" |
+                  dat$Tissue == "Neutrophils" |
+                  dat$Tissue == "NK" |
+                  dat$Tissue == "Lymph Node" |
+                  dat$Tissue == "T Cells"] = "Blood"
+
+## close gds 
+closefn.gds(gfile)
+
+## plot
+library(ggplot2)
+library(cowplot)
+library(forcats)
+library(dplyr)
+
+dat_summary = dat %>%
+  group_by(TissueBlood) %>%
+  tally()
+
+dat = merge(dat, dat_summary,  by = "TissueBlood")
+
+dat$TissueBlood = as.factor(as.character(dat$TissueBlood))
+pos = c()
+for(i in 1:length(levels(dat$TissueBlood))){
+  pos = c(pos, max(dat$error[dat$Tissue == levels(dat$TissueBlood)[i]]))
+}
+
+dat.pos = data.frame(TissueBlood = levels(dat$TissueBlood), pos, n = dat_summary$n)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexsAllTissueBoxplot.pdf", height = 9, width = 14)
+ggplot(dat, aes(x = fct_reorder(TissueBlood, blood, .fun = median, .desc =TRUE))) +
+  geom_boxplot(aes(y = error, fill = as.factor(blood))) +
+  # geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  theme_cowplot(18) +
+  scale_fill_manual(values = c("#0A8ABA", "#BA3A0A"), name = "Blood?", labels = c("No", "Yes")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  labs(x = element_blank(), y = "Cetygo") +
+  geom_text(data = dat.pos, aes(TissueBlood, label = n, y = pos+0.02))
+dev.off()
+
+## t test between blood and non blood samples
+t.test(dat$error[dat$blood ==0], dat$error[dat$blood ==1])
+
+# ## plot the same for only blood
+# datB = dat[dat$blood == 1,]
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodBoxplot.pdf", height = 10, width = 16)
+# ggplot(datB, aes(x = fct_reorder(DatasetOrigin, error, .fun = median, .desc =F), y = error, fill = "#BA3A0A")) +
+#   geom_boxplot() +
+#   theme_cowplot(18) +
+#   theme(legend.position = "none", axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.text.x.bottom = element_text(size=12)) +
+#   labs(x = "Study", y = "Cetygo")
+# dev.off()
+# 
+# 
+# ## check relationship with age
+# ## remove those without age or sex
+# datBAS = datB[!datB$Sex == "",]
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodSexCheck.pdf", height = 10, width = 16)
+# ggplot(datBAS, aes(x = fct_reorder(DatasetOrigin, error, .fun = median, .desc =F), y = error, fill = as.factor(as.character(Sex)))) +
+#   geom_boxplot() +
+#   theme_cowplot(18) +
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.text.x.bottom = element_text(size=12)) +
+#   labs(x = "Study", y = "Cetygo", fill = "Sex")
+# dev.off()
+# 
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodAgeCheck.pdf", height = 13, width = 9)
+# ggplot(datBAS, aes(x = as.numeric(as.character(Age)), y = error, col = as.factor(as.character(DatasetOrigin)))) +
+#   geom_point(size = 1.4) +
+#   theme_cowplot(18) +
+#   theme(legend.position = "bottom", legend.text = element_text(size=12)) +
+#   labs(x = "Age", y = "Cetygo", col = "Study") 
+# dev.off()
+
+## select purified blood cell types
+datB = dat[dat$blood == 1,]
+datB = datB[!(datB$Tissue == "Blood" | datB$Tissue == "Lymph Node" | datB$Tissue == "Neutrophils"), ]
+
+datB$trueProp = rep(NA, nrow(datB))
+
+datB$trueProp[datB$Tissue == "B Cells"] = datB$Bcell[datB$Tissue == "B Cells"]
+datB$trueProp[datB$Tissue == "Granulocyes"] = datB$Gran[datB$Tissue == "Granulocyes"]
+datB$trueProp[datB$Tissue == "NK"] = datB$NK[datB$Tissue == "NK"]
+datB$trueProp[datB$Tissue == "T Cells"] = datB$CD4T[datB$Tissue == "T Cells"] + datB$CD8T[datB$Tissue == "T Cells"]
+
+datB$Tissue = as.character(datB$Tissue)
+datB$Tissue[datB$Tissue == "Granulocyes"] = "Granulocytes"
+datB$Tissue = as.factor(as.character(datB$Tissue))
+
+save(datB, file = "/mnt/data1/Thea/ErrorMetric/data/bloodPurifiedPredictedFromEssex.Rdata")
+
+load("/mnt/data1/Thea/ErrorMetric/data/bloodPurifiedPredictedFromEssex.Rdata")
+
+
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodCellTypevsError.pdf", height = 10, width = 15)
+png("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodCellTypevsError.png", height = 600, width = 600)
+ggplot(datB, aes(x = trueProp, y = error, col = DatasetOrigin)) +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  geom_point(size = 2.5) +
+  theme_cowplot(18) +
+  labs(x = "Predicted proportion", y = "Cetygo", col = "Data") +
+  xlim(c(min(datB$trueProp),max(datB$trueProp))) +
+  ylim(c(0, max(datB$error))) +
+  theme(legend.position = "none") +
+  facet_wrap(~Tissue, ncol = 2)
+dev.off()
+
+
+## stacked bar charts for each study in each cell type
+## B cells
+load("/mnt/data1/Thea/ErrorMetric/data/bloodPurifiedPredictedFromEssex.Rdata")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+# predictions = datB[datB$Tissue == "T Cells",]
+# 
+# temp = cellTypeCompareStackedBar(predictions)
+
+datB = datB[,-which(colnames(datB) =="Sample")]
+datB = datB[,-which(colnames(datB) =="n")]
+datB = datB[,-which(colnames(datB) =="TissueBlood")]
+
+plotList = list()
+datB$Tissue = as.factor(as.character(datB$Tissue))
+for(i in 1:length(levels(datB$Tissue))){
+  plotList = c(plotList, 
+               cellTypeCompareStackedBar(
+                 datB[datB$Tissue == levels(datB$Tissue)[i],], labPerPlot = c("   i", "  ii"),
+                 legendPosition = "none", dashLine = T))
+}
+
+plotN = list(
+  GSE110607 = c(1, 5, 9),
+  GSE117050 = c(11),
+  GSE89251 = c(22),
+  GSE49618 = c(2, 13),
+  GSE67170 = c(16),
+  GSE71955 = c(17),
+  GSE87095 = c(3),
+  GSE87582 = c(20),
+  GSE88824 = c(4, 7, 21))
+
+plotLeg = get_legend(cellTypeCompareStackedBar(
+  datB[datB$Tissue == levels(datB$Tissue)[i],], BonlyForLeg = T))
+
+# for(i in 1:length(plotList)){
+#   pdf(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".pdf", sep = ""))
+#   print(plotList[[i]])
+#   dev.off()
+# }
+
+## just get the Tcell example
+p = plotList[[22]]
+png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar3.png", sep = ""), height = 400, width = 500)
+print(plot_grid(p, plotLeg, ncol = 2, rel_widths = c(1,0.3)))
+dev.off()
+
+
+for(i in 1:length(plotN)){
+  if(length(plotN[[i]]) ==1){
+    p = plotList[[plotN[[i]]]]
+    png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".png", sep = ""), height = 400, width = 500)
+    print(plot_grid(p, plotLeg, ncol = 2, rel_widths = c(1,0.3)))
+    dev.off()
+  }
+  
+  if(length(plotN[[i]]) ==2){
+    p = plot_grid(plotList[[plotN[[i]][1]]] , plotList[[plotN[[i]][2]]],
+                  labels = "AUTO", ncol = 2)
+    png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".png", sep = ""), height = 400, width = 700)
+    print(plot_grid(p, plotLeg, ncol = 2, rel_widths = c(2,0.3)))
+    dev.off()
+  }
+  if(length(plotN[[i]]) ==3){
+    p = plot_grid(plotList[[plotN[[i]][1]]] , plotList[[plotN[[i]][2]]], plotList[[plotN[[i]][3]]],
+                  labels = "AUTO", ncol = 3)
+    png(paste("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBar", i,".png", sep = ""), height = 400, width = 900)
+    print(plot_grid(p, plotLeg, ncol = 2, rel_widths = c(3,0.3)))
+    dev.off()
+  }
+}
+
+
+
+# pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/ErrorEssexBloodStackedBarExample.pdf", height = 9, width = 7)
+# print(plotList[[3]] )
+# dev.off()
+
+
+
+# ## plot trueProp against 1-sum(predicted)
+# datB$totalPred = rowSums(datB[,c("Bcell", "CD4T", "CD8T","Gran", "Mono","NK")])
+# datB$absDiffPred = abs(rowSums(datB[,c("Bcell", "CD4T", "CD8T","Gran", "Mono","NK")])-1)
+# 
+# 
+# ggplot(datB, aes(x = trueProp, y = absDiffPred, col = DatasetOrigin, shape = Tissue)) +
+#   geom_point() +
+#   theme_cowplot(18) +
+#   labs(x = "True proportion", y = "|Sum of predictions - 1|")
+# 
+# ggplot(datB, aes(x = trueProp, y = absDiffPred, col = error, shape = Tissue)) +
+#   geom_point() +
+#   theme_cowplot(18) +
+#   labs(x = "True proportion", y = "|Sum of predictions - 1|")
+# 
+# 
+# ## doesn't show anything! Now look up the worst datasets in GEO in the hope that they're all cancer or something...
+# datBad = datB[datB$error <0.1 & datB$trueProp<0.75,]
+# levels(as.factor(as.character(datBad$DatasetOrigin)))
+# 
+# ## get sample IDs for samples in GSE89251 with low error, bad pred and those with higher error
+# datBad[datBad$DatasetOrigin == "GSE89251" & datBad$trueProp < 0.5,"Sample"]
+# datB[datB$DatasetOrigin == "GSE89251" & datB$error > 0.2,"Sample"]
+
+
+# ### Essex look at the samples with low error ##########
+# library(gdsfmt)
+# gfile = openfn.gds("/mnt/data1/Thea/ErrorMetric/data/EssexOutput/sub.gds")
+# 
+# dat = cbind.data.frame(read.gdsn(index.gdsn(gfile$root, "Pred")),
+#                        Age = read.gdsn(index.gdsn(gfile$root, "Age")),
+#                        Sex = read.gdsn(index.gdsn(gfile$root, "Sex")),
+#                        Tissue = read.gdsn(index.gdsn(gfile$root, "Tissue")),
+#                        SubTissue = read.gdsn(index.gdsn(gfile$root, "SubTissue")),
+#                        Sample = read.gdsn(index.gdsn(gfile$root, "colnames")),
+#                        DatasetOrigin = read.gdsn(index.gdsn(gfile$root, "DatasetOrigin")))
+# load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+# colnames(dat)[1:8] = c(colnames(HousemanBlood50CpGModel$coefEsts), "error", "nCGmissing")
+# library(plyr)
+# source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+# 
+# 
+# ## subset iPSCs to get accession code
+# ipsc = dat[which(dat$Tissue == "induced Pluripotent Stem Cells"),]
+# # GSE61461
+# 
+# ipsc = ipsc[ipsc$error <0.1,]
+# ipsc = ipsc[ipsc$DatasetOrigin == "GSE61461.gds",]
+# 
+# # plotList1 = 
+# p1 = ggplot(ipsc, aes(x = fct_reorder(Sample, error, .fun = median, .desc =F), y = error)) +
+#   geom_point(size = 2) +
+#   theme_cowplot(18) + 
+#   geom_hline(yintercept = 0.1, linetype = "dashed", col = "red")+
+#   theme(axis.title.x=element_blank(),
+#         axis.text.x=element_blank(),
+#         axis.ticks.x=element_blank()) +
+#   labs(x = "Sample", y = "Cetygo") +
+#   ylim(c(0, 0.1)) +
+#   ggtitle("GSE61461 - iPSC cells")
+# 
+# 
+# propDat = gather(ipsc, key = "cellType", value = "proportion_pred", 
+#                          -one_of(c("error","nCGmissing", "Age",
+#                                    "Sex","Tissue","SubTissue","Sample","DatasetOrigin")))
+# 
+# propDat$cellType = as.factor(propDat$cellType)
+# allCellTypes = levels(propDat$cellType)
+# 
+# ## create one colour for each cell type
+# colPerCell = hue_pal()(length(allCellTypes))
+# 
+# p2 = ggplot(propDat, aes(x = fct_reorder(Sample, error, .fun = median, .desc =F), y = proportion_pred, fill = cellType)) +
+#   geom_bar(position="stack", stat="identity") +
+#   theme_cowplot(18) +
+#   theme(axis.title.x=element_blank(),
+#         axis.text.x=element_blank(),
+#         axis.ticks.x=element_blank(), 
+#         legend.position = "bottom", 
+#         legend.justification = "centre") +
+#   guides(fill = guide_legend(nrow = 1)) +
+#   labs(x = "Sample", y = "Proportion", fill = "Cell type") +
+#   scale_fill_manual(values = c(colPerCell)) +
+#   scale_y_continuous(breaks = c(0.00,0.25,0.50,0.75,1.00)) 
+# 
+# 
+# png("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/iPSCInBlood.png", height = 650, width = 575)
+# plot_grid(p1, p2, ncol = 1, axis = "lr", align = "v", labels = "AUTO", rel_heights = c(0.6,1))
+# dev.off()
+
+
+
+### comparison to estimateCellCounts.wmln #############
+
+#### Exxex server code
+# library(gdsfmt)
+# x = openfn.gds("/storage/st05d/deepmelon/GEOClod.gds", readonly=TRUE, allow.duplicate=FALSE, allow.fork=FALSE)
+# 
+# library(wateRmelon)
+# library(bigmelon)
+# ## function for creating subgds
+# ##  INPUT newGdsName - name of new file to be saved
+# ##        gfileOld - file to be subset
+# ##        pDataSplit - the pData column the data will be split using
+# ##        pDataVal - the pData value wanted
+# 
+# setwd("~/gdsTemp/")
+# 
+# # pDataVal = c("B Cells", "Granulocyes", "NK", "T Cells")
+# # newGdsName = "gsub"
+# # pDataSplit = "Tissue"
+# # gfileOld = x
+# 
+# createSubGDS = function(pDataVal, newGdsName, pDataSplit, gfileOld){
+#   tempgfile = createfn.gds(newGdsName)
+#   
+#   ## add fData
+#   add.gdsn(tempgfile, "fData", fData(gfileOld))
+#   
+#   ## get index for col/rows to keep
+#   pCol = read.gdsn(index.gdsn(index.gdsn(gfileOld$root, "pData"), pDataSplit))
+#   index = which(pCol %in% pDataVal)
+#   
+#   ## add subset pData
+#   add.gdsn(tempgfile, "pData", pData(gfileOld)[index,])
+#   
+#   ## add the rest of the data, subset
+#   add.gdsn(tempgfile, "betas", read.gdsn(index.gdsn(gfileOld, "rawbetas"))[,index])
+#   add.gdsn(tempgfile, "methylated", read.gdsn(index.gdsn(gfileOld, "methylated"))[,index])
+#   add.gdsn(tempgfile, "unmethylated", read.gdsn(index.gdsn(gfileOld, "unmethylated"))[,index])
+#   add.gdsn(tempgfile, "pvals", read.gdsn(index.gdsn(gfileOld, "pvals"))[,index])
+#   add.gdsn(tempgfile, "NBeads", read.gdsn(index.gdsn(gfileOld, "NBeads"))[,index])
+#   add.gdsn(tempgfile, "paths", read.gdsn(index.gdsn(gfileOld, "paths")))
+#   
+#   return(tempgfile)
+# }
+# 
+# # gfile = createSubGDS(pDataVal = c("B Cells", "Granulocyes", "NK", "T Cells"),
+# #                    newGdsName = "gsub",
+# #                    pDataSplit = "Tissue",
+# #                    gfileOld = x)
+# # closefn.gds(gfile)
+# # gfile = openfn.gds("gsub", readonly = F)
+# 
+# ## get prediction per study
+# library(gdsfmt)
+# library(wateRmelon)
+# library(bigmelon)
+# setwd("~/gdsTemp/")
+# gfile = openfn.gds("gsub")
+# 
+# gds2mlumi <- function(gds, i, j){
+#   history.submitted = as.character(Sys.time())
+#   x <- gds
+#   if("NBeads"%in%ls.gdsn(x)){
+#     aDat <- assayDataNew(
+#       betas = x[i, j, node = "betas",
+#                 name = TRUE, drop = FALSE],
+#       pvals = x[i, j, node = "pvals",
+#                 name = TRUE, drop = FALSE],
+#       NBeads = x[i, j, node = "NBeads", 
+#                  name = TRUE, drop = FALSE],
+#       methylated = x[i, j, node = "methylated", 
+#                      name = TRUE, drop = FALSE],
+#       unmethylated = x[i, j, node = "unmethylated", 
+#                        name = TRUE, drop = FALSE])
+#   } else {
+#     aDat <- assayDataNew(
+#       betas = x[i, j, node = "betas",
+#                 name = TRUE, drop = FALSE],
+#       pvals = x[i, j, node = "pvals",
+#                 name = TRUE, drop = FALSE],
+#       methylated = x[i, j, node = "methylated",
+#                      name = TRUE, drop = FALSE],
+#       unmethylated = x[i, j, node = "unmethylated",
+#                        name = TRUE, drop = FALSE])
+#   }
+#   # Creating MethyLumiSet
+#   x.lumi = new("MethyLumiSet", assayData=aDat)
+#   pdat <- pData(x)
+#   rownames(pdat) <- colnames(x)
+#   pData(x.lumi) <- pdat[j, , drop = FALSE]
+#   fdat <- fData(x)
+#   rownames(fdat) <- rownames(x)
+#   fData(x.lumi) <- fdat[i, , drop = FALSE]
+#   if(length(grep("QC", ls.gdsn(x), ignore.case = TRUE))>1){
+#     qcm <- QCmethylated(x)
+#     qcu <- QCunmethylated(x)
+#     colnames(qcm) <- colnames(qcu) <- colnames(x)
+#     rownames(qcm) <- rownames(qcu) <- QCrownames(x)
+#     qc <- new("MethyLumiQC",
+#               assayData = assayDataNew(
+#                 methylated = qcm[ , j, drop = FALSE],
+#                 unmethylated = qcu[ , j, drop = FALSE])
+#     )
+#     x.lumi@QC <- qc
+#   }
+#   
+#   return(x.lumi)
+# }
+# 
+# GEOLevels = unique(pData(gfile)$DatasetOrigin)
+# 
+# predList = list()
+# for(i in 1:length(GEOLevels)){
+#   y = createSubGDS(pDataVal = GEOLevels[i],
+#                    newGdsName = GEOLevels[i], 
+#                    pDataSplit = "DatasetOrigin",
+#                    gfileOld = gfile)
+#   mSet = gds2mlumi(y)
+#   predList[[i]] = estimateCellCounts.wmln(mSet)
+# }
+# 
+# # tempList = predList
+# # predList = tempList
+# for (i in 1:length(predList)){
+#   predList[[i]] = cbind.data.frame(predList[[i]], GEOLevels[i])
+#   colnames(predList[[i]])[7] = "DatasetOrigin"
+# }
+# 
+# pred = do.call("rbind.data.frame", predList)
+# 
+# save(pred, file = "~/wateRmelonPredictedProportionsPurified.Rdata")
+
+# ### knight code
+# load("/mnt/data1/Thea/ErrorMetric/data/EssexOutput/wateRmelonPredictedProportionsPurified.Rdata")
+# load("/mnt/data1/Thea/ErrorMetric/data/bloodPurifiedPredictedFromEssex.Rdata")
+# 
+# datB = datB[,c("Bcell", "CD4T", "CD8T", "Gran", "Mono", "NK", "error", "Sample", "DatasetOrigin", "Tissue", "trueProp")]
+# library(stringr)
+# datB$Sample = str_sub(datB$Sample, 12, -1)
+# 
+# pred$Sample = rownames(pred)
+# pred$DatasetOrigin = str_sub(pred$DatasetOrigin, 1, -5)
+# colnames(pred)[1:6] = paste(colnames(pred)[1:6],"WateR", sep = "_") 
+# 
+# library(dplyr)
+# Pred = inner_join(datB, pred, by = "Sample")
+# 
+# Pred$truePropWateR = Pred$Gran_WateR
+# Pred$truePropWateR[Pred$Tissue == "B Cells"] = Pred$Bcell_WateR[Pred$Tissue == "B Cells"]
+# Pred$truePropWateR[Pred$Tissue == "NK"] = Pred$NK_WateR[Pred$Tissue == "NK"]
+# Pred$truePropWateR[Pred$Tissue == "T Cells"] = Pred$CD4T_WateR[Pred$Tissue == "T Cells"] +
+#   Pred$CD8T_WateR[Pred$Tissue == "T Cells"]
+# 
+# 
+# library(ggplot2)
+# library(cowplot)
+# library(viridis)
+# library(plyr)
+# 
+# Pred$Tissue = revalue(Pred$Tissue, c("B Cells" = "Bcell",
+#                                      "Granulocytes" = "Gran",
+#                                      "T Cells" = "Tcell" ))
+# 
+# # pdf("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/MinfiVSMyPredForValidation.pdf", height = 7, width = 8)
+# png("/mnt/data1/Thea/ErrorMetric/plots/EssexDataPlots/MinfiVSMyPredForValidation.png", height = 500, width = 600)
+# ggplot(Pred, aes(x = trueProp, y = truePropWateR, shape = Tissue, col = error)) +
+#   geom_point(size = 3) +
+#   theme_cowplot(18) +
+#   scale_color_viridis() +
+#   scale_shape_manual(values = c(20, 3, 8, 18)) +
+#   labs(x = "Predictions from unnormalised RBDM\n(Proportion of annotated cell type)",
+#        y = "Predictions from wateRmelon\n(Proportion of annotated cell type)", 
+#        col = "Cetygo", shape = "Cell type")
+# dev.off()
+
+
+
+
+
+### Predict proportions in E risk purified samples (just those that overlap) ####
+library(minfi)
+load("/mnt/data1/Eilis/Projects/Asthma/QC/CombinedQC_WithMarkdown/AllRGSet.rdat")
+betas = getBeta(preprocessRaw(RGSet))
+
+pheno = read.csv("/mnt/data1/Eilis/Projects/Asthma/QC/CombinedQC_WithMarkdown/CellSortedAsthmaERisk_SamplesPassedQC.csv")
+pheno = pheno[,c("Basename", "PatientID", "Sample.Type", "sex", "CD8T", "CD4T", "NK", "Bcell", "Mono", "Gran")]
+
+## only keep cell types in prediction 
+pheno = pheno[which(pheno$Sample.Type == "B-cells" |
+                      pheno$Sample.Type == "CD4 T-cells" |
+                      pheno$Sample.Type == "CD8 T-cells" |
+                      pheno$Sample.Type == "Granulocytes" |
+                      pheno$Sample.Type == "Monocytes"),]
+
+## subset betas for those in pheno
+betas = betas[,colnames(betas) %in% pheno$Basename]
+# all(colnames(betas) == pheno$Basename)  # T
+
+## Use model to predict cell types
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+
+pred = projectCellTypeWithError(betas, modelType = "ownModel", ownModelData = HousemanBlood50CpGModel)
+
+## summarise data for plotting
+predNames =  c("CD4T", "CD8T", "Bcell", "Gran", "Mono")
+eRiskNames = c("CD4 T-cells","CD8 T-cells", "B-cells", "Granulocytes", "Monocytes")
+cellP = cellM = Celltype = error = c()
+
+for (i in 1:length(predNames)){
+  temp = pred[pheno$Sample.Type == eRiskNames[i],]
+  cellP = c(cellP, temp[,colnames(temp) == predNames[i]])
+  Celltype = c(Celltype, rep(predNames[i], nrow(temp)))
+  error = c(error, temp[,"error"])
+  pTemp = pheno[pheno$Sample.Type == eRiskNames[i],]
+  cellM = c(cellM, pTemp[,colnames(pTemp) == predNames[i]])
+}
+
+plotDat = data.frame(cellP, cellM, Celltype, error)
+
+library(ggplot2)  
+library(cowplot)  
+library(scales)
+
+colSub = hue_pal()(6)
+
+## get correlation for each cell type
+core = c()
+for (i in 1:5){ 
+  temp = plotDat[plotDat$Celltype == levels(plotDat$Celltype)[i],]
+  core = c(core, cor(temp$cellP, temp$error))
+}
+core = signif(core,2)
+
+labin = paste(levels(plotDat$Celltype), " (Cor = ", core, ")", sep = "")
+names(labin) = levels(plotDat$Celltype)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/EriskCelltypeError.pdf", height = 11, width = 8)
+ggplot(plotDat, aes(x = cellP, y = error, col = Celltype)) +
+  geom_hline(yintercept = 0.1, col= "red", linetype = "dashed") +
+  geom_point(size = 2) +
+  scale_color_manual(values = colSub[1:5]) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_cowplot(18) +
+  facet_wrap(~Celltype, nrow = 5, labeller = labeller(Celltype = labin)) +
+  labs(x = "Predicted proportion", y = "Cetygo", col = "Cell type", shape = "Cell type") +
+  theme(legend.position = "none")
+dev.off()
+
+
+
+# ### heatmaps for diagram ##############################
+# load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+# 
+# ## load functions
+# source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+# source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+# 
+# ## subset to include only 3 celltypes
+# betasTrain = betasTrain[,which(phenoTrain$celltype %in% c("Bcell", "Mono", "CD8T"))]
+# phenoTrain = phenoTrain[which(phenoTrain$celltype %in% c("Bcell", "Mono", "CD8T")),]
+# 
+# ## make model with  5 CpGs, make heatmap for each cell type and their equal sum
+# model = pickCompProbes(rawbetas = betasTrain,
+#                        cellTypes = levels(as.factor(as.character(phenoTrain$celltype))),
+#                        cellInd = as.factor(as.character(phenoTrain$celltype)),
+#                        numProbes =  5,
+#                        probeSelect = "auto")
+# 
+# 
+# library(gplots)
+# library(scales)
+# library(ComplexHeatmap)
+# 
+# col = list(Celltype = c("Bcell" = "#F8766D", #"CD4T" = "#B79F00",
+#                         "CD8T" = "#00BA38",  #"Gran" = "#00BFC4",
+#                         "Mono" = "#619CFF"#,  "NK" = "#F564E3"
+# ))
+# 
+# ha <- HeatmapAnnotation(Celltype = phenoTrain$celltype,
+#                         col = col)
+# 
+# Heatmap(model$coefEst, name = "DNAm",
+#         top_annotation = ha, show_row_names = F, show_column_names = F, show_row_dend = F, cluster_rows = F, cluster_columns = F)
+# 
+# Heatmap(rowSums(model$coefEst)/3, cluster_rows = F, cluster_columns = F)
+# 
+# Heatmap(apply(model$coefEst,1, function(x){x[1]*0.8 +
+#     x[2]*0.1 +
+#     x[3]*0.1 }), cluster_rows = F, cluster_columns = F)
+# 
+# 
+# Heatmap(apply(model$coefEst,1, function(x){x[1]*0.2 +
+#     x[2]*0.4 +
+#     x[3]*0.4}), cluster_rows = F, cluster_columns = F)
+
+
+# ### Check extent of normalisation in model CpGs vs all #####
+# ## Blood
+# load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+# 
+# library(minfi)
+# library(wateRmelon)
+# library(FlowSorted.Blood.450k)
+# library("IlluminaHumanMethylation450kanno.ilmn12.hg19")
+# 
+# compositeCellType = "Blood"
+# platform<-"450k"
+# referencePkg <- sprintf("FlowSorted.%s.%s", compositeCellType, platform)
+# data(list = referencePkg)
+# referenceRGset <- get(referencePkg)
+# phenoDat = pData(referenceRGset)$CellType
+# 
+# ## only keep the 6 wanted cell types
+# index = which(phenoDat == "Bcell" | 
+#                 phenoDat == "CD4T" | 
+#                 phenoDat == "CD8T" | 
+#                 phenoDat == "Gran" | 
+#                 phenoDat == "Mono" | 
+#                 phenoDat == "NK")
+# phenoDat = as.factor(phenoDat[index]) 
+# betas = referenceRGset[,index]
+# 
+# 
+# U = getBeta(preprocessRaw(betas))
+# N = getBeta(preprocessQuantile(betas, sex = "M"))
+# 
+# 
+# 
+# 
+# mU = U[rownames(U) %in% rownames(HousemanBlood50CpGModel$coefEsts),]
+# mN = N[rownames(N) %in% rownames(HousemanBlood50CpGModel$coefEsts),]
+# 
+# median(abs(U - N), na.rm = T)
+# median(abs(mU - mN), na.rm = T)
+# 
+# 
+# ## compare to CETS
+# load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/CETSmodel50CpG.Rdata")
+# library(minfi)
+# library(wateRmelon)
+# library(FlowSorted.DLPFC.450k)
+# library(gdsfmt)
+# library(IlluminaHumanMethylation450kmanifest)
+# 
+# 
+# ## CETS data
+# referencePkg <- sprintf("FlowSorted.%s.%s", "DLPFC", "450k")
+# data(list = referencePkg)
+# referenceRGset <- get(referencePkg)
+# 
+# Uc = getBeta(preprocessRaw(referenceRGset))
+# Nc = getBeta(preprocessQuantile(referenceRGset))
+# 
+# mUc = Uc[rownames(Uc) %in% rownames(CETSmodel$coefEsts),]
+# mNc = Nc[rownames(Nc) %in% rownames(CETSmodel$coefEsts),]
+# 
+# median(abs(Uc - Nc), na.rm = T)
+# median(abs(mUc - mNc), na.rm = T)
+
+
+
+
+### median sample intensity vs Cetygo ####
+
+## load data
+# dat = read.csv("/mnt/data1/EXTEND/Methylation/QC/Batch1/EXTEND_RIST_SamplesFailedQC.csv")
+
+# # write.table(dat$Basename, file = "/mnt/data1/Thea/ErrorMetric/data/EXTENDFailedBasenames.txt", append = FALSE, sep = "\t",
+# #             row.names = F, col.names = F, quote = F)
+# 
+# idats = list.files("/mnt/data1/Thea/ErrorMetric/data/EXTENDFailedIdats/")[seq(1,70,2)]
+# idats = unlist(strsplit(idats,  "_G"))[seq(1,70,2)]
+# 
+# sum(idats %in% dat$Basename)
+# 
+# library(wateRmelon)
+# mSet <-  readEPIC(idatPath="/mnt/data1/Thea/ErrorMetric/data/EXTENDFailedIdats", barcodes=dat$Basename, parallel = FALSE, force=T)
+# save(mSet, file = "/mnt/data1/Thea/ErrorMetric/data/EXTENDFailedMset.Rdata")
+
+# load("/mnt/data1/EXTEND/Methylation/QC/Batch1/EXTEND_batch1_RIST_Normalised.rdat")
+# load("/mnt/data1/Thea/ErrorMetric/data/EXTENDFailedMset.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/pickCompProbes.R")
+source("/mnt/data1/Thea/ErrorMetric/DSRMSE/projectCellTypeWithError.R")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+library(wateRmelon)
+load("/mnt/data1/Josh/PPMI/Methylation_data/Pipeline/mSetPPMI.Rdata")
+pheno = read.csv("/mnt/data1/Josh/PPMI/Methylation_data/Pipeline/QCmetrics_full.csv")
+
+betas = betas(msetEPIC)
+M = methylated(msetEPIC)
+U = unmethylated(msetEPIC)
+
+# rm(mSet)
+
+pred = as.data.frame(projectCellTypeWithError(betas, "ownModel", ownModelData = HousemanBlood50CpGModel))
+
+pred$M = apply(M,2, median)
+pred$U = apply(U,2, median)
+
+
+library(ggplot2)
+library(cowplot)
+
+
+p1 = ggplot(pred, aes(x = M, y = error)) +
+  geom_point(size = 2.5) +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  theme_cowplot(18) +
+  labs(y = "Cetygo", x = "Median methylated intensity") +
+  ylim(c(0, max(pred$error)))
+
+
+p2 = ggplot(pred, aes(x = U, y = error)) +
+  geom_point(size = 2.5) +
+  geom_hline(yintercept = 0.1, col = "red", linetype = "dashed") +
+  theme_cowplot(18)+
+  ylab("Cetygo") +
+  labs(y = "Cetygo", x = "Median unmethylated intensity") +
+  ylim(c(0, max(pred$error)))
+
+png("/mnt/data1/Thea/ErrorMetric/plots/modelApplicability/CetygoAndIntensityBloodPPMI.png", height = 600, width = 500)
+plot_grid(p1,p2, ncol = 1, labels = "AUTO")
+dev.off()
+
+
+#### calculate n cell types needed for model and plot ####
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+rm(betasTrain, betasTest, phenoTest, phenoTrain)
+plot = nCellsNeededForDeconvolution(betas, phenoCell = pheno$celltype)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/ValidateInitialModel/nTrainingDataIndividualsNeeded.pdf", height = 5, width = 6)
+plot
+dev.off()
+
+#### Which is easier to deconvolute, bulk or purified? ####
+## rerun when model rerun train and test first
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+load("/mnt/data1/Thea/ErrorMetric/data/Houseman/unnormalisedBetasTrainTestMatrix.Rdata")
+load("/mnt/data1/Thea/ErrorMetric/DSRMSE/models/HousemanBloodModel50CpG.Rdata")
+rm(betas, betasTrain, pheno, phenoTrain)
+simData = simPropMaker3(model = HousemanBlood50CpGModel, testBetas = betasTest, pheno = phenoTest$celltype)
+
+## predict proportions with Cetygo
+pred = projectCellTypeWithError(simData[[1]], modelType = "ownModel", ownModelData = HousemanBlood50CpGModel)
+
+plotDat = cbind.data.frame(Cetygo = pred[,"error"], Max = apply(simData[[2]],1,max))
+
+save(plotDat, pred, simData, file = "/mnt/data1/Thea/ErrorMetric/data/plotDat/purityPlot.Rdata")
+
+library(ggplot2)
+library(cowplot)
+
+pdf("/mnt/data1/Thea/ErrorMetric/plots/badData/PurityOfSampleCetygo.pdf", height = 5, width = 6)
+ggplot(plotDat, aes(x = factor(Max, levels = seq(1,0.2,-0.1)), y = Cetygo)) +
+  geom_violin() +
+  theme_cowplot(18) +
+  labs(x = "Maximum cellular proportion\nat any cell type")
+dev.off()
+
+### plot n cell types with 0 prop against pred 0
+load("/mnt/data1/Thea/ErrorMetric/data/plotDat/purityPlot.Rdata")
+
+library(ggplot2)
+library(cowplot)
+
+simData[[2]] = simData[[2]][,colnames(pred)[1:6]]
+simData[[2]] = as.data.frame(simData[[2]])
+pred = as.data.frame(pred)
+
+library(reshape2)
+dat = cbind.data.frame(melt(pred, measure.vars = c(colnames(pred)[1:6]), id.vars = c("error", "nCGmissing")), 
+                       melt(simData[[2]], measure.vars = c(colnames(pred)[1:6])))
+
+colnames(dat) = c("error", "nCGmissing", "Celltype", "pred", "Celltype.x", "true")
+dat$diff = abs(dat$true - dat$pred)
+
+png("/mnt/data1/Thea/ErrorMetric/plots/badData/AccuracyIsCellTypeDependent.png", height = 450, width = 500)
+ggplot(dat, aes(x = Celltype, y = diff, fill = Celltype)) +
+  geom_violin() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  theme_cowplot(18) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none") +
+  labs(x = "Cell type", y = "Difference between simulated\nand predicted proportion")
+dev.off()
+
+
+## get median dif for each cell types
+
+for (i in 1:6){
+  print(levels(dat$Celltype)[i])
+  print(median(dat$diff[dat$Celltype == levels(dat$Celltype)[i]]))
+}
+
+
+# 
+# 
+# dat$true = as.factor(dat$true)
+# dat = dat[-which(dat$true == 0 | dat$true == 1),]
+# 
+# png("/mnt/data1/Thea/ErrorMetric/plots/badData/purityCellTypeExplanation.png", height = 500, width = 550)
+# ggplot(dat, aes(x = true, y = diff, fill = Celltype)) +
+#   geom_violin() +
+#   geom_hline(yintercept = 0, linetype = "dashed") +
+#   facet_wrap(~Celltype, ncol = 2) +
+#   theme_cowplot(18) + 
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+#   labs(x = "Simulated proportion", y = "Simulated - predicted proportions")
+# dev.off()
+# 
+# 
+# ggplot(dat, aes(x = true, y = error, fill = Celltype)) +
+#   geom_violin() +
+#   geom_hline(yintercept = 0, linetype = "dashed") +
+#   facet_wrap(~Celltype, ncol = 2) +
+#   theme_cowplot(18) + 
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+#   labs(x = "Simulated proportion", y = "Cetygo")
+
+
+
+#### plot sim RMSE vs Cetygo across all sim samples ####
+load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+pred = predBulk[[1]]
+rm(modelList, predBulk)
+
+pred = as.data.frame(pred)
+true = bulk[[2]][,colnames(pred)[1:6]]
+colnames(pred)[1:6] = paste(colnames(true), "_t", sep = "")
+all = cbind.data.frame(pred, true)
+
+RMSE = function(m, o){
+  sqrt(mean((m - o)^2))
+}
+
+all$rmse = apply(all, 1, function(x){RMSE(x[1:6], x[9:14])})
+
+library(ggplot2)
+library(cowplot)
+install.packages("scatterpie")
+library(scatterpie)
+
+ggplot() +
+  geom_scatterpie(data = all, aes(x = rmse, y = error),
+                  size = 0.8,
+                  cols = c("Bcell_t", "CD4T_t", "CD8T_t", "Gran_t", "Mono_t", "NK_t")) + 
+  coord_equal() +
+  theme_cowplot(18) +
+  labs(x = "RMSE of predicted and simulated\nproportions",
+       y = "Cetygo")
+
+## useless! Too much going on!
+
+
+
+#### compare accuracy of 3 mod to 6 mod in those in 3 mod ####
+load("/mnt/data1/Thea/ErrorMetric/data/nCellTypeModels/VaryNCellsData.Rdata")
+source("/mnt/data1/Thea/ErrorMetric/RScripts/FunctionsForErrorTesting.R")
+
+cellTypes = c("Bcell", "CD4T", "CD8T", "Gran", "Mono", "NK")
+cellTypeShorthand = c("B", "C4", "C8", "G", "M", "NK")
+
+
+modelPresent = matrix(ncol = length(cellTypes), nrow = 42, data = 0)
+colnames(modelPresent) = cellTypes
+
+
+for(i in 1:6){
+  modelPresent[grep(cellTypeShorthand[i],names(modelList)),i] = 1
+}
+
+modelN = rowSums(modelPresent)
+
+
+mod6 = modelList[[which(modelN == 6)]]
+
+mod3Index = which(modelN == 3)
+i = 1
+
+for (i in 1:length(mod3Index)){
+  ## index the samples that have the right cell types in
+  mod3Cell = modelPresent[mod3Index[i],]
+  cell3Index = which(rowSums(bulk[[2]][,names(mod3Cell)[mod3Cell == 0]]) == 0)
+  
+  ## RMSE of accuracy in mod3
+  acc3 = apply(cbind.data.frame(predBulk[[mod3Index[i]]][cell3Index,], 
+                                bulk[[2]][cell3Index, colnames(predBulk[[mod3Index[i]]][cell3Index,])[1:3]]),
+               1, 
+               function(x){RMSE(x[1:3], x[c(6,7,8)])})
+  acc6 = apply(cbind.data.frame(predBulk[[which(modelN == 6)]][cell3Index,], bulk[[2]][cell3Index,]),
+               1, 
+               function(x){RMSE(x[1:6], x[c(12, 10, 11, 9, 13, 14)])})
+  err3 = predBulk[[mod3Index[i]]][cell3Index,"error"]
+  err6 = predBulk[[which(modelN == 6)]][cell3Index,"error"]
+}
+
+plotDat = cbind.data.frame(err3, err6, acc3, acc6)
+
+library(ggplot2)
+library(cowplot)
+library(viridis)
+
+ggplot(plotDat, aes(x = err3, y = err6)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = c(0,0)) +
+  ylim(c(0.015,0.05)) +
+  xlim(c(0.015,0.05)) +
+  theme_cowplot(18) +
+  labs(x = "Cetygo across 3 cell type model",
+       y = "Cetygo across 6 cell type model")
+
+ggplot(plotDat, aes(x = acc3, y = acc6)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = c(0,0)) +
+  # ylim(c(0.015,0.05)) +
+  # xlim(c(0.015,0.05)) +
+  theme_cowplot(18) +
+  labs(x = "RMSE across 3 cell type model",
+       y = "RMSE across 6 cell type model")
+
+ggplot(plotDat, aes(x = acc3, y = err3)) +
+  geom_point() +
+  # geom_abline(slope = 1, intercept = c(0,0)) +
+  # ylim(c(0.015,0.05)) +
+  # xlim(c(0.015,0.05)) +
+  theme_cowplot(18) +
+  labs(x = "RMSE across 3 cell type model",
+       y = "Cetygo across 3 cell type model")
+
+ggplot(plotDat, aes(x = acc6, y = err6)) +
+  geom_point() +
+  # geom_abline(slope = 1, intercept = c(0,0)) +
+  # ylim(c(0.015,0.05)) +
+  # xlim(c(0.015,0.05)) +
+  theme_cowplot(18) +
+  labs(x = "RMSE across 6 cell type model",
+       y = "Cetygo across 6 cell type model")
