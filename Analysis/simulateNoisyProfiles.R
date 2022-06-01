@@ -125,7 +125,7 @@ colnames(predPropAll.epic)[10:12]<-c("RMSE", "TotalComposition", "Array")
 colnames(predPropAll.epic)<-colnames(predPropAll.450k)
 predPropAll<-rbind(predPropAll.450k, predPropAll.epic)
 
-save(predPropAll, file = "RData/ResultsNoisyProfilesWithinBatch")
+save(predPropAll, file = "RData/ResultsNoisyProfilesWithinBatch.rdata")
 
 
 ## train in 450K test in EPIC with noise
