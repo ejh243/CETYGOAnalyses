@@ -14,7 +14,6 @@ library(gridExtra)
 library(CETYGO)
 library(quadprog)
 
-print(idatList)
 
 sampToLoad<-read.csv(idatList)
 msetEPIC <- readEPIC(idatPath, barcodes=sampToLoad[,1])
@@ -50,10 +49,10 @@ predProp$pFilterPass<-pFilterPass
 predProp$qcPass<-qcPass
 
 
-figa1 <- ggplot(predProp, aes(x=qcPass, y=CETYGO)) + 
+figa1 <- ggplot(predProp, aes(x=qcPass, y=CETYGO, colour=qcPass)) + 
     geom_violin() + 
-	geom_boxplot(width=0.1)+
-	labs(y = "CETYGO", x = "Pass QC")
+	geom_boxplot(width=0.02)+
+	labs(y = "CETYGO", x = "Pass QC", color = "Pass QC")
 	
 figa2<-ggplot(predProp, aes(x=M.median, y=CETYGO, colour=qcPass)) + 
     geom_point() +
@@ -61,8 +60,8 @@ figa2<-ggplot(predProp, aes(x=M.median, y=CETYGO, colour=qcPass)) +
     xlab("Median M intensity") +
     expand_limits(y=0)+
     expand_limits(x=0) +
-	theme_bw() +
-	theme(legend.position = "none")
+	theme_bw()  +
+  labs(color = "Pass QC")
 
 	
 figa3<-ggplot(predProp, aes(x=U.median, y=CETYGO, colour=qcPass)) + 
@@ -72,7 +71,8 @@ figa3<-ggplot(predProp, aes(x=U.median, y=CETYGO, colour=qcPass)) +
     expand_limits(y=0)+
     expand_limits(x=0) +
 	theme_bw() +
-	theme(legend.position = "none")
+  labs(color = "Pass QC")
+
 	
 		
 figa4<-ggplot(predProp, aes(x=bs, y=CETYGO, colour=qcPass)) + 
@@ -82,11 +82,12 @@ figa4<-ggplot(predProp, aes(x=bs, y=CETYGO, colour=qcPass)) +
     expand_limits(y=0)+
     expand_limits(x=100) +
 	theme_bw() +
-	theme(legend.position = "none")
+  labs(color = "Pass QC")
+
 
 ggarrange(figa1, figa2, figa3, figa4, 
           labels = c("A", "B", "C", "D"),
-          ncol = 2, nrow = 2)
+          ncol = 2, nrow = 2, common.legend = TRUE, legend="bottom")
 		  
 ggsave("plots/ScatterplotsCETYGOAgainstQCMetrics.pdf", width = 16, height = 16, units = "cm")
 
